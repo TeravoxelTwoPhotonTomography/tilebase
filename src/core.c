@@ -19,7 +19,7 @@
 #include "nd.h"
 #include "aabb.h"
 #include "core.h"
-#include "metadata.h"
+#include "metadata/metadata.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -42,6 +42,8 @@
 struct _tile_t
 { aabb_t aabb;  ///< bounding box for the tile
   ndio_t file;  ///< opened file for reading
+  nd_t   shape;
+  float* transform;
 };
 
 struct _tiles_t
@@ -54,6 +56,15 @@ struct _tiles_t
 //
 // === TILE API ===
 //
+
+void TileFree(tile_t self)
+{ if(!self) return;
+  AABBFree(self->aabb);
+  ndioClose(self->file);
+  ndfree(self->shape);
+  if(self->transform) free(self->transform);
+  free(self);
+}
 
 /**
  * Load tile data from the tile at \a path using the metadata format \a format.
@@ -70,8 +81,12 @@ tile_t TileFromFile(const char* path, const char* format)
   NEW(struct _tile_t,out,1);
   ZERO(struct _tile_t,out,1);
   TRY(meta=MetadataOpen(path,format,"r"));
+  TRY(out->aabb=AABBMake(0));
   TRY(MetadataGetTileAABB(meta,out));
   TRY(out->file=MetadataOpenVolume(meta,"r"));
+  TRY(out->shape=ndioShape(out->file));
+  NEW(float,out->transform,ndndim(out->shape));
+  TRY(MetadataGetTransform(meta,out->transform));
   MetadataClose(meta);
   return out;
 Error:
@@ -80,15 +95,41 @@ Error:
   return 0;
 }
 
-void TileFree(tile_t self)
-{ if(!self) return;
-  AABBFree(self->aabb);
-  ndioClose(self->file);
-  free(self);
-}
 
 aabb_t TileAABB(tile_t self) { return self->aabb; }
 ndio_t TileFile(tile_t self) { return self->file; }
+
+/**
+ * Computes the voxel size from the tile database for dimension \a idim.
+ * Use AABBNDim(TileAABB(self)) to get the number of dimensions.
+ *
+ * \returns The voxel size in physical units (e.g. nanometers).  The actual
+ *          length scale depends on the units used for the aabb_t.
+ */
+float TileVoxelSize(tile_t self, unsigned idim)
+{ int64_t *shape;
+  float r;
+  TRY(self);
+  TRY(AABBGet(self->aabb,NULL,NULL,&shape));
+  r=shape[idim]/(float)ndshape(self->shape)[idim];
+  return r;
+Error:
+  return 0.0;
+}
+
+
+/**
+ * Get pixel to space transform.
+ * For example, a point at index ir=(ix,iy,iz) will be mapped to r=T.ir,
+ * where T is the \a matrix computed by this function.
+ *
+ * \returns an array of (ndim+1)*(ndim+1) elements where ndim is the 
+ *          dimensionality of the volume read from TileFile().
+ *                        
+ */
+float* TileTransform(tile_t self)
+{ return self->transform;
+}
 
 //
 //  === TILE COLLECTION ===
@@ -113,12 +154,13 @@ Error:
 }
 
 /**
- * \param[in,out]   out   Must have sufficient length (as indicated by \a n).
+ * \param[in,out]   out   Must have length of at least \a n.
+ * \param[in]       n     Must be greater than the length of path1+path2+2.
  * \returns \a out on success, otherwise 0.
  */
 static char* join(char* out, size_t n, const char *path1, const char* path2)
 { size_t n1,n2;
-  TRY(n<(n1=strlen(path1))+(n2=strlen(path2))+2); // +1 for the /, +1 for the terminating null
+  TRY(n>(n1=strlen(path1))+(n2=strlen(path2))+2); // +1 for the /, +1 for the terminating null
   strcat(out,path1);
   strcat(out+n1,"/");
   strcat(out+n1+1,path2);
@@ -135,22 +177,23 @@ Error:
  * also try to open \a path as a tile.  If a tile is
  * successfully loaded, it's added to the internal tile list.
  */
-static unsigned addtiles(tiles_t tiles,const char *path)
+static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
 { int any=0;
-  char next[1024];
+  char next[1024]={0};
   DIR *dir=0;
   struct dirent *ent;
   TRY(path);
   TRY(dir=opendir(path));
-  while(ent=readdir(dir)) // need to avoid '.' and '..'?
+  while(ent=readdir(dir))
   { if(ent->d_type==DT_DIR)
-      TRY(addtiles(tiles,join(next,sizeof(next),path,ent->d_name)));
-    else
-      if(ent->d_type==DT_REG) any=1;
+    { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
+        TRY(addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format));
+    }
+    else if(ent->d_type==DT_REG) any=1;
   }
   closedir(dir);
   if(any)
-    TRY(push(tiles,TileFromFile(path,NULL))); // autodetect tile format
+    TRY(push(tiles,TileFromFile(path,format)));
   return 1;
 Error:
   if(dir) closedir(dir);
@@ -160,11 +203,11 @@ Error:
 /**
  * Open all the tiles contained in a directory tree rooted at \a path.
  */
-tiles_t TileBaseOpen(const char *path)
+tiles_t TileBaseOpen(const char* path, const char* format)
 { tiles_t out=0;
   NEW( struct _tiles_t,out,1);
   ZERO(struct _tiles_t,out,1);
-  TRY(addtiles(out,path));
+  TRY(addtiles(out,path,format));
   return out;
 Error:
   TileBaseClose(out);
@@ -189,4 +232,40 @@ void TileBaseClose(tiles_t self)
  */
 size_t TileBaseCount(tiles_t self)
 { return self?self->sz:0;
+}
+
+/**
+ * The tile array.
+ */
+tile_t* TileBaseArray(tiles_t self)
+{ return self?self->tiles:0;
+}
+
+/**
+ * Computes the box bounding the tiles.
+ * \returns 0 if error, otherwise the bounding box of the entire tile set.
+ *          The caller is responsible for freeing the returned array.
+ */
+aabb_t TileBaseAABB(tiles_t self)
+{ aabb_t out=0;
+  size_t i;
+  for(i=0;i<self->sz;++i)
+    out=AABBUnionIP(out,self->tiles[i]->aabb);
+  return out;
+Error:
+  return 0;
+}
+
+/**
+ * Computes the voxel size from the tile database for dimension \a idim.
+ * Use AABBNDim(TileAABB(TileBaseArray(self))) to get the number of dimensions.
+ *
+ * \returns The voxel size in physical units (e.g. nanometers).  The actual
+ *          length scale depends on the units used for the aabb_t.
+ */
+float TileBaseVoxelSize(tiles_t self, unsigned idim)
+{ TRY(self && self->sz>0);  
+  return TileVoxelSize(self->tiles[0],idim);// assumes all tiles have the same shape
+Error:
+  return 0.0;
 }

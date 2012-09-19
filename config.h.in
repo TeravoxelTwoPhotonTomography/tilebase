@@ -1,2 +1,3 @@
 #define METADATA_PLUGIN_PATH     "plugins"
+#define ND_ROOT_DIR              "@ND_ROOT_DIR@"
 #define TILEBASE_TEST_DATA_PATH  "@TILEBASE_TEST_DATA_PATH@"

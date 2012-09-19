@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(metadata-protobuf-v0-plugin)
 
-set(CMAKE_MODULE_PATH  ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
-
 macro(show v)
   message("${v} is ${${v}}")
 endmacro()
@@ -14,9 +12,11 @@ set(PBUFV0_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
-find_package(Protobuf)
-if(PROTOBUF_FOUND)
+find_package(PROTOBUF CONFIG PATHS cmake)
+find_package(EIGEN CONFIG PATHS cmake)
+if(PROTOBUF_FOUND AND EIGEN_FOUND)
   include_directories(${PROTOBUF_INCLUDE_DIR})
+  include_directories(${EIGEN_INCLUDE_DIR})
   get_directory_property(TILEBASE_SOURCE_DIR PARENT_DIRECTORY)
   include_directories(${TILEBASE_SOURCE_DIR})
 
@@ -50,7 +50,8 @@ if(PROTOBUF_FOUND)
   #  Testing
   ##############################################################################
 
-  include(GenerateGoogleTest)
+
+  find_package(GTEST CONFIG PATHS cmake)
   file(GLOB TEST_SOURCES test/*.cc)
   if(GTEST_FOUND AND TEST_SOURCES)
     find_package(Threads)
@@ -66,6 +67,8 @@ if(PROTOBUF_FOUND)
       )
     add_dependencies(meta-protobuf-v0-tests gtest)
     add_test(TestMetadataProtobufV0 meta-protobuf-v0-tests)
+    install(TARGETS meta-protobuf-v0-tests
+          RUNTIME DESTINATION bin)
   endif()
 
   ##############################################################################
@@ -74,11 +77,13 @@ if(PROTOBUF_FOUND)
   install(TARGETS meta-protobuf-v0
     EXPORT meta-protobuf-v0-targets
     LIBRARY DESTINATION bin/${TILEBASE_PLUGIN_PATH}
+    RUNTIME DESTINATION bin/${TILEBASE_PLUGIN_PATH}
+    ARCHIVE DESTINATION lib/${TILEBASE_PLUGIN_PATH}
   )
   export(TARGETS meta-protobuf-v0 FILE meta-protobuf-v0-targets.cmake)
   install(EXPORT meta-protobuf-v0-targets DESTINATION cmake)
 
-endif(PROTOBUF_FOUND)
+endif()
 
 ################################################################################
 #  Documentation

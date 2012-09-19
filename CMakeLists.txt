@@ -8,8 +8,6 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
   "Tile Database"
   )
 
-set(CMAKE_MODULE_PATH  ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
-
 macro(show v)
   message("${v} is ${${v}}")
 endmacro()
@@ -20,23 +18,26 @@ endmacro()
 
 set(TILEBASE_PLUGIN_PATH plugins)
 
+find_package(ND CONFIG PATHS cmake)
+include_directories(${ND_INCLUDE_DIRS})
+
 set(TILEBASE_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
-
-find_package(ND)
-include_directories(${ND_INCLUDE_DIR})
 
 ################################################################################
 # SOURCE
 ################################################################################
 
+include_directories(${PROJECT_SOURCE_DIR})
 file(GLOB SRCS src/*.c src/metadata/*.c)
 file(GLOB HDRS src/*.h src/metadata/*.h src/util/*.h)
 
 ################################################################################
 # TARGETS
 ################################################################################
+
+### LIBRARY ###
 
 add_definitions(-fPIC)
 add_library(tilebase
@@ -45,20 +46,23 @@ add_library(tilebase
   ${PROJECT_BINARY_DIR}/config.h
   )
 target_link_libraries(tilebase 
-  ${ND_LIBRARY}
+  ${ND_LIBRARIES}
   ${CMAKE_DL_LIBS})
 
-# ndio plugins
+# tile metadata plugins
 file(GLOB PLUGINS plugins/*)
 foreach(PLUGIN ${PLUGINS})
   add_subdirectory(${PLUGIN})
 endforeach(PLUGIN)
 
+### APPS ###
+add_subdirectory(app/export-quadtree)
+
 ###############################################################################
 #  Testing
 ###############################################################################
 
-include(GenerateGoogleTest)
+find_package(GTEST CONFIG PATHS cmake)
 file(GLOB TEST_SOURCES test/*.cc)
 if(GTEST_FOUND AND TEST_SOURCES)
   find_package(Threads)
@@ -104,12 +108,11 @@ endif()
 ###############################################################################
 install(TARGETS tilebase
   EXPORT tilebase-targets
-  RUNTIME DESTINATION bin/
-  LIBRARY DESTINATION lib/
-  ARCHIVE DESTINATION lib/static
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
   PUBLIC_HEADER DESTINATION include/tilebase
 )
 export(TARGETS tilebase FILE tilebase-targets.cmake)
 install(EXPORT tilebase-targets DESTINATION cmake/)
-
 

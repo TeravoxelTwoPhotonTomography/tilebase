@@ -10,17 +10,22 @@
 
 #include <fcntl.h>
 #include <errno.h>
-//#include <io.h>
 
 #include <string.h>
 #include <dirent.h>
 #include "microscope.pb.h"
 #include "stack.pb.h"
 #include "tilebase.h"
-#include "src/metadata.h"
+#include "src/metadata/metadata.h"
 #include "src/metadata/interface.h"
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+using namespace Eigen;
+
 /// @cond DEFINES
+#define PBUFV0_FORMAT_NAME "fetch.protobuf.v0"
+
 #define ENDL               "\n"
 #define LOG(...)           fprintf(stderr,__VA_ARGS__)
 #define TRY(e)             do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
@@ -69,8 +74,8 @@ struct pbufv0_t
 
   /**
    * Notes:
-   * \verbatim
    * File's have the form:
+   * \verbatim
    * <path>/<seriesno>-<prefix>.<channo>.<ext>
    *
    * <channo>   <==> ivol
@@ -83,10 +88,10 @@ struct pbufv0_t
    */
   std::string get_vol_path()
   { //extract the series no. from the path
-    char channo[]=".%.";
-    std::string series=path.substr(path.rfind('/'));
-    std::string out=path+"/"+series+"-"+scope.file_prefix()+channo
-                   +normalize_extension(scope.stack_extension());
+    std::string channo(".%.");
+    std::string series=path.substr(path.rfind('/')); // yields eg: "/00038"
+    std::string out(path+series+"-"+scope.file_prefix()+channo
+                    +normalize_extension(scope.stack_extension()));
     return out;
   }
 };
@@ -112,7 +117,7 @@ static
 int readDesc(const char* filename, desc_t *desc)
 { int fd;
   int isok=1;
-  google::protobuf::io::ZeroCopyInputStream *raw;
+  google::protobuf::io::ZeroCopyInputStream *raw=0;
   google::protobuf::TextFormat::Parser parser;
   ErrorCollector e;
   TRY(-1<(fd=open(filename,O_RDONLY)));
@@ -146,9 +151,10 @@ static
 char* find(char* out,size_t n, const char* path, const char *ext)
 { DIR *dir=0;
   struct dirent *ent=0;
+  char *r;
   TRYMSG(dir=opendir(path),strerror(errno));
   while((ent=readdir(dir)))
-  { if(strcmp(strrchr(ent->d_name,'.'),ext)==0)
+  { if((r=strrchr(ent->d_name,'.')) && strcmp(r,ext)==0)
     { const char *s[]={path,"/",ent->d_name};
       cat(out,n,countof(s),s);
       break;
@@ -211,15 +217,14 @@ Error:
 }
 
 int parse_mode_string(char* mode, unsigned *r, unsigned *w)
-{ char *m=mode;
-  *r=*w=0;
-  do
-  { switch(*w)
+{ *r=*w=0;
+  for(char *m=mode;*m;++m)
+  { switch(*m)
     { case 'r': *r=1; break;
       case 'w': *w=1; break;
       default: FAIL("Invalid mode string");
     }
-  } while(*++w);
+  }
   return 1;
 Error:
   return 0;
@@ -230,7 +235,7 @@ Error:
 //
 
 const char* pbufv0_name()
-{ return "fetch.protobuf.v0"; }
+{ return PBUFV0_FORMAT_NAME; }
 
 /**
  * Just checks for the existence of the expected files at \a path.
@@ -274,9 +279,9 @@ void pbufv0_close(metadata_t self)
 unsigned pbufv0_origin(metadata_t self, size_t *nelem, int64_t* origin)
 { pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
   static const int64_t mm2nm = 1e6;
-  *nelem=3;
+  if(nelem) *nelem=3;
   if(!origin) //just set nelem and return
-    return 0;
+    return 1;
   origin[0]=ctx->stack.x_mm()*mm2nm;
   origin[1]=ctx->stack.y_mm()*mm2nm;
   origin[2]=ctx->stack.z_mm()*mm2nm;
@@ -310,7 +315,7 @@ Error:
 unsigned pbufv0_shape(metadata_t self, size_t *nelem, int64_t* shape)
 { pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
   static const int64_t um2nm = 1e3;
-  *nelem=3;
+  if(nelem) *nelem=3;
   if(!shape) //just set nelem and return
     return 0;
   shape[0]=ctx->scope.fov().x_size_um();
@@ -322,6 +327,71 @@ unsigned pbufv0_shape(metadata_t self, size_t *nelem, int64_t* shape)
 ndio_t pbufv0_get_vol(metadata_t self, const char* mode)
 { pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
   return ndioOpen(ctx->get_vol_path().c_str(),"series",mode);
+}
+
+// === Transform ===
+// The utilities used below don't compose matrices, they just set certain
+// elements.
+
+// static void identity(float *matrix, unsigned ndim)
+// { unsigned i;
+//   memset(matrix,0,sizeof(float)*(ndim+1)*(ndim+1));
+//   for(i=0;i<=ndim;++i) matrix[i*(ndim+2)]=1.0f;
+// }
+// static void setscale(float *matrix, unsigned ndim, unsigned idim, float s)
+// { matrix[idim*(ndim+2)]=s;}
+// static void flip(float *matrix, unsigned ndim, unsigned idim)
+// { matrix[idim*(ndim+2)]*=-1.0f;
+// }
+// /**
+//  * Shear parallel to \a adim by \a bdim:
+//  * \verbatim
+//  * r'[adim]=r[adim]+s*r[bdim]</tt>
+//  * \endverbatim
+//  */
+// static void shear(float *matrix, unsigned ndim, float s, unsigned adim, unsigned bdim)
+// { matrix[adim*(ndim+1)+bdim]=s;
+// }
+// static void translate(float *matrix, unsigned ndim, float s, unsigned idim)
+// { matrix[idim*(ndim+1)+ndim]=s;
+// }
+
+unsigned pbufv0_get_transform(metadata_t self, float *transform)
+{ pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
+  
+  nd_t vol;  
+  unsigned i,n;
+  int64_t shape[3],ori[3];
+
+  ndio_t file;
+  TRY(file=pbufv0_get_vol(self,"r"));
+  vol=ndioShape(file);
+  ndioClose(file);
+
+  TRY((n=ndndim(vol))==3 || n==4); // 3d or 3d+1 color dimension
+  TRY(pbufv0_shape(self,NULL,shape));
+  TRY(pbufv0_origin(self,NULL,ori));
+
+  { AngleAxisf       R(ctx->scope.fov().rotation_radians(),Vector3f(0,0,1));
+    Translation3f    center(-ndshape(vol)[0]/2.0f,-ndshape(vol)[1]/2.0f,0.0f);
+    Translation3f    stage(ori[0],ori[1],ori[2]);
+    AlignedScaling3f S=Scaling( shape[0]/(float)ndshape(vol)[0],
+                               -shape[1]/(float)ndshape(vol)[1], // flip y
+                                shape[2]/(float)ndshape(vol)[2]
+                              );
+    Map<Matrix<float,Dynamic,Dynamic,RowMajor> > M(transform,n+1,n+1);
+    M.setIdentity();
+    M(2,1)=1.0/(float)ndshape(vol)[1]; // shear parallel to z by y: 1 plane along length of 1
+    M.block<3,3>(0,0)=
+       stage              // translate to stage origin
+      *R                  // rotate field
+      *S                  // scale to physical coordinates (and flip)
+      *center             // Move origin to optical axis, begining of zpiezo movement
+      *M.block<3,3>(0,0); // pixels
+  }
+  return 1;
+Error:
+  return 0;
 }
 
 //
@@ -339,7 +409,7 @@ ndio_t pbufv0_get_vol(metadata_t self, const char* mode)
 extern "C"
 const metadata_api_t* get_metadata_api()
 { static const metadata_api_t api =
-	{ pbufv0_name,
+	{   pbufv0_name,
       pbufv0_is_fmt,
       pbufv0_open,
       pbufv0_close,
@@ -347,7 +417,10 @@ const metadata_api_t* get_metadata_api()
       pbufv0_set_origin,
       pbufv0_shape,
       pbufv0_set_shape,
-      pbufv0_get_vol
+      pbufv0_get_vol,
+      pbufv0_get_transform,
+      ndioAddPlugin,
+      NULL
 	};
   return &api;
 }

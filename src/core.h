@@ -24,18 +24,21 @@ extern "C" {
 typedef struct _tile_t  *tile_t;
 typedef struct _tiles_t *tiles_t;
 
-tile_t  TileFromFile(const char* path, const char* format);
-void    TileFree(tile_t self);
-aabb_t  TileAABB(tile_t self);
-ndio_t  TileFile(tile_t self);
-
-tiles_t TileBaseOpen(const char *path);
+tiles_t TileBaseOpen(const char *path, const char* format);
 void    TileBaseClose(tiles_t self);
 //char*       TileBaseError();
 //void        TileBaseResetError();
 
 //int         TileBaseToSVG(tiles_t self,const char *path);
 size_t  TileBaseCount(tiles_t self);
+tile_t* TileBaseArray(tiles_t self);
+aabb_t  TileBaseAABB(tiles_t self);
+float   TileBaseVoxelSize(tiles_t self, unsigned idim);
+
+aabb_t  TileAABB(tile_t self); // returned AABB owned by tile.
+ndio_t  TileFile(tile_t self); // returned file handle already opened.  Owned by tile.
+float*  TileTransform(tile_t self);
+float   TileVoxelSize(tile_t self, unsigned idim);
 
 //loader_t    TileBaseCreateLoader(tiles_t self);
 

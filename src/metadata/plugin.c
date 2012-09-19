@@ -8,9 +8,9 @@
 // \section ndio-plugins-system Plugins
 #include "nd.h"
 #include "tilebase.h"
-#include "../metadata.h"
+#include "metadata.h"
 #include "plugin.h"
-#include "interface.h"102
+#include "interface.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +32,7 @@
 #define TRY(e,msg) do{ if(!(e)) {LOG("%s(%d): %s"ENDL "\tExpression evaluated to false."ENDL "\t%s"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e,msg); goto Error; }} while(0)
 #define NEW(type,e,nelem) TRY((e)=(type*)malloc(sizeof(type)*(nelem)),"Memory allocation failed.")
 #define SILENTTRY(e,msg) do{ if(!(e)) { goto Error; }} while(0)
-#if 1
+#if 0
 #define DBG(...) LOG(__VA_ARGS__)
 #else
 #define DBG(...)
@@ -219,14 +219,14 @@ static int recursive_load(apis_t *apis,DIR* dir,const char *path)
     { char *buf;
       size_t n=strlen(path)+strlen(ent->d_name)+2;
       const char *p[]={path,"/",ent->d_name};
-      if( 0==strcmp(ent->d_name,".")*strcmp(ent->d_name,".."))
+      if(ent->d_name[0]=='.')// respect hidden files/paths //0==strcmp(ent->d_name,".")*strcmp(ent->d_name,".."))
         continue;
       TRY(buf=(char*)alloca(n),"Out of stack space.");
       cat(buf,n,3,p);
 #ifdef DEBUG_SEARCH
       puts(buf);
 #endif
-      TRY(child=opendir(buf),"Failed to open child directory.");
+      TRY(child=opendir(buf),buf); // "Failed to open child directory."
       TRY(recursive_load(apis,child,buf),"Search for plugins failed.");
       closedir(child);
       child=0;
@@ -272,6 +272,19 @@ metadata_apis_t MetadataLoadPlugins(const char *path, size_t *n)
   TRY(dir=opendir(buf),strerror(errno));
   TRY(recursive_load(&apis,dir,buf),"Search for plugins failed.");
   *n=apis.n;
+  
+  // Register loaded ndio plugins with loaded metadata plugins
+  // to share across shared library boundaries.
+  { size_t i,n;
+    ndio_fmt_t **ndio_plugins=ndioPlugins(&n);
+    for(i=0;i<apis.n;++i)
+    { size_t j;
+      if(apis.v[i]->add_ndio_plugin)
+        for(j=0;j<n;++j)
+          apis.v[i]->add_ndio_plugin(ndio_plugins[j]);
+    }
+  }
+
 Finalize:
   if(dir) closedir(dir);
   if(exepath) free(exepath);

@@ -59,19 +59,40 @@ typedef unsigned    (*_metadata_set_shape_t) (metadata_t self, size_t  nelem, in
  */
 typedef ndio_t      (*_metadata_get_vol_t)   (metadata_t self,const char *mode);
 /**
+ * Reads the affine transform mapping pixel coordinates to spatial coordinates.
+ * Has shape <tt>(ndim+1)*(ndim+1)</tt>, where \c ndim is the number of
+ * dimensions in the volume (this includes color channel dimensions).
+ *
+ * \param[in]     self        The metadata context.
+ * \param[in,out] transform   Should be a preallocated array with
+ *                            <tt>(ndim+1)^2</tt> elements.
+ * \returns 1 on success, 0 otherwise
+ */
+typedef unsigned    (*_metadata_get_transform_t)(metadata_t self, float *transform);
+
+/**
+ * Since shared libraries don't share global memory, we need to pass loaded ndio
+ * plugins to any shared libraries that want to use them (and don't have the 
+ * right plugin path)
+ */
+typedef unsigned    (*_metadata_add_ndio_plugin_t)(ndio_fmt_t *api);
+
+/**
  * Tilebase metadata formats must implement the functions in this interface.
  */
 struct _metadata_api_t
 {
-  _metadata_name_t       name;      ///< \returns a null-terminated string reflecting the name of the implementation used to read/write a tile's metadata.
-  _metadata_is_fmt_t     is_fmt;    ///< \returns 1 if the tile metadata at \a path can be opened with mode \a mode, otherwise 0.
-  _metadata_open_t       open;      ///< \returns NULL on error, otherwise a pointer to a context for reading or writing metadata. \param[in] path Path to a tile directory.  \param[in] mode Should be "r" for reading, or "w" for writing.
-  _metadata_close_t      close;     ///< Closes an open metadata context.
-  _metadata_origin_t     origin;    ///< Get the origin of the tile in nanometers (nm).
-  _metadata_set_origin_t set_origin;///< Set the origin of the tile in nanometers (nm).
-  _metadata_shape_t      shape;     ///< Get the size of the tile's bounding box in nanometers (nm).
-  _metadata_set_shape_t  set_shape; ///< Set the size of the tile's bounding box in nanometers (nm).
-  _metadata_get_vol_t    get_vol;   ///< Open the file for volume \a i according to the specified \a mode.
+  _metadata_name_t            name;      ///< \returns a null-terminated string reflecting the name of the implementation used to read/write a tile's metadata.
+  _metadata_is_fmt_t          is_fmt;    ///< \returns 1 if the tile metadata at \a path can be opened with mode \a mode, otherwise 0.
+  _metadata_open_t            open;      ///< \returns NULL on error, otherwise a pointer to a context for reading or writing metadata. \param[in] path Path to a tile directory.  \param[in] mode Should be "r" for reading, or "w" for writing.
+  _metadata_close_t           close;     ///< Closes an open metadata context.
+  _metadata_origin_t          origin;    ///< Get the origin of the tile in nanometers (nm).
+  _metadata_set_origin_t      set_origin;///< Set the origin of the tile in nanometers (nm).
+  _metadata_shape_t           shape;     ///< Get the size of the tile's bounding box in nanometers (nm).
+  _metadata_set_shape_t       set_shape; ///< Set the size of the tile's bounding box in nanometers (nm).
+  _metadata_get_vol_t         get_vol;   ///< Open the file for volume \a i according to the specified \a mode.
+  _metadata_get_transform_t   get_transform;
+  _metadata_add_ndio_plugin_t add_ndio_plugin;
   void *lib;                        ///< Handle to the library context (if not null)
 };
 typedef const metadata_api_t* (*get_metadata_api_t)(void); ///< \returns the interface used to read/write tile metadata.  The caller will not free the returned pointer.  It should be statically allocated by the implementation.

@@ -3,6 +3,7 @@
  */
 
 #include "opts.h"
+ opts_t OPTS={0}; // instance the OPTS global variable (declared in opts.h)
 #include <boost/program_options.hpp>
 #include <iostream>
 #include "dirent.h"
@@ -93,6 +94,7 @@ const char* tilebase_format_help_string()
 static ExistingPath   g_input_path;
 static std::string    g_output_path;
 
+
 //
 // === OPTION PARSER ===
 //
@@ -102,10 +104,10 @@ static char *basename(char* argv0)
   return r?(r+1):argv0;
 }
 
-unsigned parse_args(opts_t *opts, int argc, char *argv[])
+unsigned parse_args(int argc, char *argv[])
 { string usage=string("Usage: ")+string(basename(argv[0]))+" [options] <source-path> <dest-path>";
   options_description desc("Options");
-  opts->src=opts->dst=0;
+  OPTS.src=OPTS.dst=0;
   try
   {
     desc.add_options()
@@ -147,7 +149,7 @@ unsigned parse_args(opts_t *opts, int argc, char *argv[])
     cerr<<"Unknown error!"<<endl<<usage<<endl<<desc<<endl;
     return 0;
   }
-  opts->src=g_input_path.path_.c_str();
-  opts->dst=g_output_path.c_str();
+  OPTS.src=g_input_path.path_.c_str();
+  OPTS.dst=g_output_path.c_str();
   return 1;
 }

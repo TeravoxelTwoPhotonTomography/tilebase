@@ -19,12 +19,17 @@
 #include "src/metadata/metadata.h"
 #include "src/metadata/interface.h"
 
+#include <iostream>
+#include <Eigen/Dense>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 using namespace Eigen;
+using namespace std;
 
 /// @cond DEFINES
 #define PBUFV0_FORMAT_NAME "fetch.protobuf.v0"
+
+//#define DEBUG // if defined, turns on debug output
 
 #define ENDL               "\n"
 #define LOG(...)           fprintf(stderr,__VA_ARGS__)
@@ -127,7 +132,7 @@ int readDesc(const char* filename, desc_t *desc)
   TRY(e.ok());
 Finalize:
   if(fd>=0) close(fd);    
-  delete raw;
+  if(raw) delete raw;
   return isok;
 Error:
   isok=0;
@@ -356,6 +361,8 @@ ndio_t pbufv0_get_vol(metadata_t self, const char* mode)
 // { matrix[idim*(ndim+1)+ndim]=s;
 // }
 
+
+
 unsigned pbufv0_get_transform(metadata_t self, float *transform)
 { pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
   
@@ -372,22 +379,39 @@ unsigned pbufv0_get_transform(metadata_t self, float *transform)
   TRY(pbufv0_shape(self,NULL,shape));
   TRY(pbufv0_origin(self,NULL,ori));
 
-  { AngleAxisf       R(ctx->scope.fov().rotation_radians(),Vector3f(0,0,1));
-    Translation3f    center(-ndshape(vol)[0]/2.0f,-ndshape(vol)[1]/2.0f,0.0f);
-    Translation3f    stage(ori[0],ori[1],ori[2]);
-    AlignedScaling3f S=Scaling( shape[0]/(float)ndshape(vol)[0],
-                               -shape[1]/(float)ndshape(vol)[1], // flip y
-                                shape[2]/(float)ndshape(vol)[2]
-                              );
+  { MatrixXf         center(n+1,n+1),stage(n+1,n+1),S(n+1,n+1),R(n+1,n+1);
+
+    R.setIdentity().block<3,3>(0,0)=AngleAxisf(ctx->scope.fov().rotation_radians(),Vector3f(0,0,1)).matrix();
+    center.setIdentity().block<3,1>(0,n)
+        << (-(float)ndshape(vol)[0]/2.0f),
+           (-(float)ndshape(vol)[1]/2.0f),
+           0.0f;
+    stage.setIdentity().block<3,1>(0,n)
+        << (float)ori[0],
+           (float)ori[1],
+           (float)ori[2];
+    S.setIdentity().block<3,3>(0,0).diagonal()
+        <<  shape[0]/(float)ndshape(vol)[0],
+           -shape[1]/(float)ndshape(vol)[1], // flip y
+            shape[2]/(float)ndshape(vol)[2];
+
     Map<Matrix<float,Dynamic,Dynamic,RowMajor> > M(transform,n+1,n+1);
     M.setIdentity();
     M(2,1)=1.0/(float)ndshape(vol)[1]; // shear parallel to z by y: 1 plane along length of 1
-    M.block<3,3>(0,0)=
-       stage              // translate to stage origin
+    M=(stage              // translate to stage origin
       *R                  // rotate field
       *S                  // scale to physical coordinates (and flip)
       *center             // Move origin to optical axis, begining of zpiezo movement
-      *M.block<3,3>(0,0); // pixels
+      *M).eval(); // pixels
+#ifdef DEBUG
+#define show(v) cout<<#v": "<<endl<<(v)<<endl<<endl
+    show(R);
+    show(center);
+    show(stage);
+    show(S);
+    show(M);
+#undef show
+#endif
   }
   return 1;
 Error:

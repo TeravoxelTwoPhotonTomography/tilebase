@@ -78,6 +78,7 @@ void TileFree(tile_t self)
 tile_t TileFromFile(const char* path, const char* format)
 { tile_t out=0;
   metadata_t meta=0;
+  unsigned n;
   NEW(struct _tile_t,out,1);
   ZERO(struct _tile_t,out,1);
   TRY(meta=MetadataOpen(path,format,"r"));
@@ -85,7 +86,8 @@ tile_t TileFromFile(const char* path, const char* format)
   TRY(MetadataGetTileAABB(meta,out));
   TRY(out->file=MetadataOpenVolume(meta,"r"));
   TRY(out->shape=ndioShape(out->file));
-  NEW(float,out->transform,ndndim(out->shape));
+  n=ndndim(out->shape);
+  NEW(float,out->transform,(n+1)*(n+1));
   TRY(MetadataGetTransform(meta,out->transform));
   MetadataClose(meta);
   return out;

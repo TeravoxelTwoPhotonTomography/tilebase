@@ -70,18 +70,18 @@ if(GTEST_FOUND AND TEST_SOURCES)
   include_directories(${PROJECT_SOURCE_DIR})
   include_directories(${GTEST_INCLUDE_DIR})
   
-  add_executable(tilebase-tests ${TEST_SOURCES})
-  target_link_libraries(tilebase-tests
+  add_executable(test-tilebase ${TEST_SOURCES})
+  target_link_libraries(test-tilebase
     ${GTEST_BOTH_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     tilebase
     )
-  add_dependencies(tilebase-tests
+  add_dependencies(test-tilebase
     gtest
     ${PLUGINS}
   )
-  add_test(TestTilebase tilebase-tests)
-  install(TARGETS tilebase-tests
+  add_test(TestTilebase test-tilebase)
+  install(TARGETS test-tilebase
           RUNTIME DESTINATION bin)
 endif()
 

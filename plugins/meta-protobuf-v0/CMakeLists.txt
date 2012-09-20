@@ -58,16 +58,16 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
     enable_testing()
     include_directories(${PROJECT_SOURCE_DIR})
     include_directories(${GTEST_INCLUDE_DIR})
-    add_executable(meta-protobuf-v0-tests ${TEST_SOURCES} ${CFG})
-    target_link_libraries(meta-protobuf-v0-tests
+    add_executable(test-meta-protobuf-v0 ${TEST_SOURCES} ${CFG})
+    target_link_libraries(test-meta-protobuf-v0
       ${GTEST_BOTH_LIBRARIES}
       ${CMAKE_THREAD_LIBS_INIT}
       tilebase
       ${PROTOBUF_LIBRARY}
       )
-    add_dependencies(meta-protobuf-v0-tests gtest)
-    add_test(TestMetadataProtobufV0 meta-protobuf-v0-tests)
-    install(TARGETS meta-protobuf-v0-tests
+    add_dependencies(test-meta-protobuf-v0 gtest)
+    add_test(TestMetadataProtobufV0 test-meta-protobuf-v0)
+    install(TARGETS test-meta-protobuf-v0
           RUNTIME DESTINATION bin)
   endif()
 

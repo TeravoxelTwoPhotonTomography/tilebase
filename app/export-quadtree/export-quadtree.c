@@ -21,10 +21,9 @@
 int main(int argc, char* argv[])
 { unsigned ecode=0;
   tiles_t tiles=0;
-  opts_t opts;
-  TRY(parse_args(&opts,argc,argv));
-  printf("OPTS: %s %s\n",opts.src,opts.dst);
-  TRY(tiles=TileBaseOpen(opts.src,opts.src_format));
+  TRY(parse_args(argc,argv));
+  printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
+  TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
   //TRY(render(tiles,TileBaseAABB(tiles)));
 Finalize:
   TileBaseClose(tiles);

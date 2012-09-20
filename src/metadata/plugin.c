@@ -72,7 +72,7 @@ static int is_shared_lib(const char *fname,size_t n)
   int len;
   SILENTTRY(dot=strrchr(fname,'.'),"No extension found in file name.");
   len = n-(dot-fname+1);
-  DBG("Searching for [%10s] Got extension [%15s]. Length %2d. File: %s"ENDL,
+  DBG("[PLUGIN] Searching for [%10s] Got extension [%15s]. Length %2d. File: %s"ENDL,
       EXTENSION,dot+1,len,fname);
   return len==(sizeof(EXTENSION)-1) //"sizeof" includes the terminating NULL
       && (0==strncmp(dot+1,EXTENSION,len));
@@ -93,7 +93,7 @@ static void cat(char *buf, size_t nbytes, int nstrings, const char** strings)
 }
 
 /**
- * Loads the \a ndio_fmt_t interface from the shared library named \a fname
+ * Loads the interface from the shared library named \a fname
  * found at the path \a path.
  */
 static metadata_api_t* load(const char *path, const char *fname)
@@ -113,10 +113,10 @@ static metadata_api_t* load(const char *path, const char *fname)
     TRY(lib=LoadLibrary(buf),"There was a problem loading the specified library.");
   }
 #endif
-  DBG("[PLUGIN] %-20s fname: %s"ENDL,path,fname);
+  DBG("[TRY   ] %-20s fname: %s"ENDL,path,fname);
   SILENTTRY(get=(get_metadata_api_t)GetProcAddress((HMODULE)lib,"get_metadata_api"),estring());
   TRY(api=(metadata_api_t*)get(),fname);
-
+  DBG("[ ---> ] Loaded: %s"ENDL,api->name());
   api->lib=lib;
 Finalize:
   return api;

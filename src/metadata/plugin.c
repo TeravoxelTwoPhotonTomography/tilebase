@@ -1,11 +1,11 @@
 /**
  * \file
- * Loader for plugin based file input and output.
+ * Loader for plugin based tile input and output.
  *
  * \author Nathan Clack
  * \date   June 2012
  */
-// \section ndio-plugins-system Plugins
+// \section tileio-plugins-system Plugins
 #include "nd.h"
 #include "tilebase.h"
 #include "metadata.h"
@@ -44,6 +44,7 @@
 //    Use the dirent (posix) interface for directory traversal.
 #ifdef _MSC_VER
 #include <windows.h>
+#include "Shlwapi.h"                                        // for PathIsRelative()
 #include "dirent.win.h"                                     // use posix-style directory traversal
 const char* estring();
 #else // POSIX
@@ -150,7 +151,7 @@ Error:
 }
 
 #if   defined(_MSC_VER)
-#error "TODO: implement and test"
+#include "windows.h"
 #elif defined(__MACH__)
 #include <mach-o/dyld.h>
 #elif defined(__linux)
@@ -173,7 +174,14 @@ Error:
 static char* rpath(void)
 { char* out=NULL;
 #if   defined(_MSC_VER)
-#error "TODO: implement and test"
+  { DWORD sz=1024,ret;
+    out=(char*)malloc(sz);
+    while( (ret=GetModuleFileName(NULL,out,sz))>sz && ret!=0)
+      out=(char*)realloc(out,sz=ret);
+    TRY(ret,"Call to GetModuleFileName() failed.");
+    *(strrchr(out,'\\'))='\0'; // filename is appended...so trim that off
+    return out;
+  }
 #elif defined(__MACH__)
   { uint32_t bufsize=0;
     char *tmp;

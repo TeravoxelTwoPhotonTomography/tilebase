@@ -1,17 +1,17 @@
 /**
  * Command line option parsing.
  */
-
+#define NOMINMAX
+#include "dirent.win.h"
 #include "opts.h"
  opts_t OPTS={0}; // instance the OPTS global variable (declared in opts.h)
 #include <iostream>
 #include <sstream>
-#include <algorithm>
-#include "dirent.h"
 #include <cmath>
 #include <boost/program_options.hpp>
 #include "tilebase.h"
 #include "src/metadata/metadata.h"
+#include <algorithm>
 
 #define countof(e) (sizeof(e)/sizeof(*e))
 

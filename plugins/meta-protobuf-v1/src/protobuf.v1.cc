@@ -12,7 +12,13 @@
 #include <errno.h>
 
 #include <string.h>
+#ifdef _MSC_VER
+#include "dirent.win.h"
+#include <io.h>
+#define snprintf _snprintf
+#else
 #include <dirent.h>
+#endif
 #include "microscope.pb.h"
 #include "stack.pb.h"
 #include "tilebase.h"
@@ -436,7 +442,7 @@ Error:
 extern "C"
 const metadata_api_t* get_metadata_api()
 { static const metadata_api_t api =
-	{   pbufv1_name,
+  {   pbufv1_name,
       pbufv1_is_fmt,
       pbufv1_open,
       pbufv1_close,
@@ -448,6 +454,6 @@ const metadata_api_t* get_metadata_api()
       pbufv1_get_transform,
       ndioAddPlugin,
       NULL
-	};
+  };
   return &api;
 }

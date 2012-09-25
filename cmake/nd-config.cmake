@@ -63,8 +63,14 @@ find_package_handle_standard_args(ND DEFAULT_MSG
   ND_INCLUDE_DIR
 )
 
-### install plugins to parent project plugings
+### install plugins to parent project plugins
 foreach(p ${ND_PLUGINS})
   get_target_property(_path ${p} IMPORTED_LOCATION)
   install(FILES ${_path} DESTINATION bin/plugins)
 endforeach()
+
+### install extra shared libs
+# TODO: How to get the list without building once?
+#       Probably have to do a cmake -P special.cmake and install(CODE)
+file(GLOB EXTRAS ${ND_ROOT_DIR}/bin/*${CMAKE_SHARED_MODULE_SUFFIX})
+install(FILES ${EXTRAS} DESTINATION bin)

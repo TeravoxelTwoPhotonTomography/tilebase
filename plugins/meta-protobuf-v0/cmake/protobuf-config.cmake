@@ -7,26 +7,57 @@ include(FindPackageHandleStandardArgs)
 # === PACKAGE ===
 #
 
-if(NOT TARGET protobuf)
-  ExternalProject_Add(protobuf
-    URL     http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz
-    URL_MD5 dc84e9912ea768baa1976cb7bbcea7b5
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
-  )
+set(PROTBUF_URL http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz)
+set(PROTOBUF_MD5 dc84e9912ea768baa1976cb7bbcea7b5)
+
+if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(PLAT x64)
+  else()
+    set(PLAT x86)
+  endif()
+  if(NOT TARGET protobuf)
+    ExternalProject_Add(protobuf
+      URL     ${PROTOBUF_URL}
+      URL_MD5 ${PROTOBUF_MD5}
+      BUILD_IN_SOURCE 1
+      CONFIGURE_COMMAND ""
+      LIST_SEPARATOR ^^
+      BUILD_COMMAND msbuild /target:protoc /target:libprotobuf /p:Configuration=Debug /p:Platform=${PLAT} <SOURCE_DIR>/vsprojects/protobuf.sln
+      INSTALL_COMMAND ""
+    )
+  endif()
+  set(PROP _EP_SOURCE_DIR)
+  set(INC src)
+  set(LIB vsprojects/${CMAKE_CFG_INTDIR})
+  set(BIN vsprojects/${CMAKE_CFG_INTDIR})
+else()
+  if(NOT TARGET protobuf)
+    ExternalProject_Add(protobuf
+      URL     ${PROTOBUF_URL}
+      URL_MD5 ${PROTOBUF_MD5}
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure;--prefix=<INSTALL_DIR>
+    )
+  endif()
+  set(PROP _EP_INSTALL_DIR)
+  set(INC include)
+  set(LIB lib)
+  set(BIN bin)  
 endif()
-get_target_property(PROTOBUF_ROOT_DIR protobuf _EP_INSTALL_DIR)
-set(PROTOBUF_INCLUDE_DIR ${PROTOBUF_ROOT_DIR}/include CACHE PATH "Location of google/protobuf/message.h" FORCE)
+get_target_property(PROTOBUF_ROOT_DIR protobuf ${PROP})
+
+set(PROTOBUF_INCLUDE_DIR ${PROTOBUF_ROOT_DIR}/${INC} CACHE PATH "Location of google/protobuf/message.h" FORCE)
 
 add_library(libprotobuf STATIC IMPORTED)
 set_target_properties(libprotobuf PROPERTIES
   IMPORTED_LINK_INTERFACE_LANGUAGES "C"
-  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}protobuf${CMAKE_STATIC_LIBRARY_SUFFIX}"
+  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/${LIB}/libprotobuf${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
 add_dependencies(libprotobuf protobuf)
 
 add_executable(protoc IMPORTED)
 set_target_properties(protoc PROPERTIES
-  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/bin/protoc"
+  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/${BIN}/protoc"
 )
 add_dependencies(protoc protobuf)  
 

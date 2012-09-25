@@ -25,6 +25,13 @@ set(TILEBASE_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
+### Windows shell lightweight utility functions - for plugin search
+if(WIN32)
+find_library(SHLWAPI Shlwapi.lib) 
+else()
+set(SHLWAPI)
+endif()
+
 ################################################################################
 # SOURCE
 ################################################################################
@@ -47,7 +54,9 @@ add_library(tilebase
   )
 target_link_libraries(tilebase 
   ${ND_LIBRARIES}
-  ${CMAKE_DL_LIBS})
+  ${CMAKE_DL_LIBS}
+  ${SHLWAPI}
+)
 
 # tile metadata plugins
 file(GLOB PLUGINS plugins/*)
@@ -71,7 +80,8 @@ if(GTEST_FOUND AND TEST_SOURCES)
   include_directories(${GTEST_INCLUDE_DIR})
   
   add_executable(test-tilebase ${TEST_SOURCES})
-  target_link_libraries(test-tilebase
+
+  target_link_libraries(test-tilebase    
     ${GTEST_BOTH_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     tilebase

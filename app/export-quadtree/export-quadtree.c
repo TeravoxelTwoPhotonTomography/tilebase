@@ -8,6 +8,9 @@
 #include "src/opts.h"
 #include "src/render.h"
 #include "src/mkpath.h"
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 
 #define countof(e) (sizeof(e)/sizeof(*e))
 

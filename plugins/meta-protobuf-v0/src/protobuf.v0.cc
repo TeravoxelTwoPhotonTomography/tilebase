@@ -12,7 +12,13 @@
 #include <errno.h>
 
 #include <string.h>
+#ifdef _MSC_VER
+#include "dirent.win.h"
+#include <io.h>
+#define snprintf _snprintf
+#else
 #include <dirent.h>
+#endif
 #include "microscope.pb.h"
 #include "stack.pb.h"
 #include "tilebase.h"

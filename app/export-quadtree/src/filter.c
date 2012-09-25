@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <math.h>
 #include "nd.h"
+#ifdef _MSC_VER
+#define isfinite _finite
+#endif
 
 #define ENDL        "\n"
 #define LOG(...)    fprintf(stderr,__VA_ARGS__) 
@@ -24,7 +27,7 @@
 static nd_t linspace(nd_t x, float min, float max)
 { size_t i,n=ndnelem(x);
   const float dx=(max-min)/(n-1);
-  float *restrict d=nddata(x);
+  float *restrict d=(float*)nddata(x);
   TRY(ndtype(x)==nd_f32);
   for(i=0;i<n;++i)
     d[i]=min+i*dx;

@@ -18,14 +18,14 @@ TEST_F(FetchProtobufV0,NonExistent)
 
 TEST_F(FetchProtobufV0,AutoDetect)
 { tiles_t tiles;
-  EXPECT_NE((void*)NULL,tiles=TileBaseOpen(PBUFV0_TEST_DATA_PATH "/00038",""));
+  EXPECT_NE((void*)NULL,tiles=TileBaseOpen(PBUFV0_TEST_DATA_PATH "/00495",""));
   EXPECT_EQ(1,TileBaseCount(tiles));
   TileBaseClose(tiles);
 }
 
 TEST_F(FetchProtobufV0,ByName)
 { tiles_t tiles;
-  EXPECT_NE((void*)NULL,tiles=TileBaseOpen(PBUFV0_TEST_DATA_PATH "/00038","fetch.protobuf.v0"));
+  EXPECT_NE((void*)NULL,tiles=TileBaseOpen(PBUFV0_TEST_DATA_PATH "/00495","fetch.protobuf.v0"));
   EXPECT_EQ(1,TileBaseCount(tiles));
   TileBaseClose(tiles);
 }

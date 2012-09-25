@@ -27,6 +27,10 @@
 #define SAFEFREE(e)                  if(e){free(e); (e)=NULL;}
 
 #define BIT(e,n) (((e)>>(n))&1)
+
+ #ifndef restrict
+ #define restrict __restrict
+ #endif
 /// @endcond
 
 /** Describes an axis aligned bounding box.
@@ -43,7 +47,8 @@ struct _aabb_t
 
 static
 int resize(aabb_t self, size_t ndim)
-{ REALLOC(int64_t,self->ori,2*ndim);
+{ REALLOC(int64_t,self->ori  ,ndim);
+  REALLOC(int64_t,self->shape,ndim);
   self->ndim=ndim;
   return 1;
 Error:
@@ -53,8 +58,8 @@ Error:
 aabb_t AABBMake(size_t ndim)
 { aabb_t out=0;
   NEW(struct _aabb_t,out,1);
-  NEW(int64_t,out->ori,2*ndim);
-  out->shape=out->ori+ndim;
+  NEW(int64_t,out->ori,ndim);
+  NEW(int64_t,out->shape,ndim);
   out->ndim=ndim;
   return out;
 Error:
@@ -77,7 +82,8 @@ aabb_t AABBCopy(aabb_t dst, aabb_t src)
   if(dst==src) return dst;
   if(!dst) dst=AABBMake(src->ndim);
   TRY(resize(dst,src->ndim));
-  memcpy(dst->ori,src->ori,sizeof(int64_t)*2*src->ndim);
+  memcpy(dst->ori  ,src->ori  ,sizeof(int64_t)*src->ndim);
+  memcpy(dst->shape,src->shape,sizeof(int64_t)*src->ndim);
   return dst;
 Error:
   return 0;
@@ -117,13 +123,17 @@ size_t AABBNDim(aabb_t self)
 { return self?self->ndim:0;
 }
 
+static int same(size_t n, int64_t *restrict a, int64_t *restrict b)
+{ size_t i;
+  for(i=0;i<n;++i) if(a[i]!=b[i]) return 0;
+  return 1;
+}
+
 int AABBSame(aabb_t a, aabb_t b)
 { size_t i;
   if(a->ndim!=b->ndim) return 0;
-  for(i=0;i<2*a->ndim;++i)
-    if(a->ori[i]!=b->ori[i])
-      return 0;
-  return 1;
+  return same(a->ndim,a->ori  ,b->ori) &&
+         same(a->ndim,a->shape,b->shape);
 }
 
 static unsigned ulog2(unsigned x)
@@ -134,8 +144,6 @@ static unsigned ulog2(unsigned x)
 static unsigned ispow2(unsigned x)
 { return x==(1<<ulog2(x));
 }
-
-
 static void _mn(int64_t *a, int64_t b)
 { *a=(*a<b)?(*a):b;
 }

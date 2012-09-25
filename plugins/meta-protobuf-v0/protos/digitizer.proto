@@ -22,9 +22,8 @@ message NIScopeDigitizer
     optional double holdoff_seconds = 3  [default=0.0];   // length of time before re-enable
     optional double delay_seconds   = 4  [default=0.0];   // length of time before start acquire
   }
-
   message Channel
-  { 
+  {
     enum Coupling {                                       // NISCOPE_ATTR_VERTICAL_COUPLING. ENUM values conform to NIScope
       AC = 0;
       DC = 1;

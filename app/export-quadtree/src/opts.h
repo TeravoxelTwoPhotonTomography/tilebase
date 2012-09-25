@@ -12,6 +12,13 @@ typedef struct _opts_t
   const char *src;
   const char *dst;
   const char *src_format;
+  const char *dst_pattern;
+
+  float x_um;
+  float y_um;
+  float z_um;
+
+  unsigned countof_leaf;
 } opts_t;
 
 extern opts_t OPTS; // Global variable for holding config loaded from parse_args

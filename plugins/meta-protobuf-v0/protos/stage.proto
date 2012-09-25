@@ -5,13 +5,13 @@ package fetch.cfg.device;
 message C843StageController
 { 
   message Axis
-    {
-        optional uint32 id    = 1 [default=1];         //1-4
-        optional string stage = 2 [default="NOSTAGE"]; //M-511.DD (XY), M-501.DG (Z)
-    }
+	{
+		optional uint32 id    = 1 [default=1];         //1-4
+		optional string stage = 2 [default="NOSTAGE"]; //M-511.DD (XY), M-501.DG (Z)
+	}
 
-    optional uint32 id   = 1 [default=1];
-    repeated Axis   axis = 2;
+	optional uint32 id   = 1 [default=1];
+	repeated Axis   axis = 2;
 }
 
 message SimulatedStage
@@ -20,7 +20,7 @@ message SimulatedStage
   { optional float min_mm = 1 [default=  0.0];
     optional float max_mm = 2 [default=100.0];
   }
-  repeated Axis axis = 2;
+	repeated Axis   axis = 2;
 }
 
 message Point3d
@@ -40,10 +40,10 @@ message Stage
   { PixelAligned = 0;
     StageAligned = 1;
   }
-  optional StageType            kind                        = 1;
-  optional C843StageController  c843                        = 2;
-  optional SimulatedStage       simulated                   = 3;  
-  optional TilingMode           tilemode                    = 5;
+  optional StageType            kind      = 1;
+  optional C843StageController  c843      = 2;
+  optional SimulatedStage       simulated = 3;  
+  optional TilingMode           tilemode  = 5;
   optional Point3d              default_velocity_mm_per_sec = 6;
   optional Point3d              last_target_mm              = 7;
 }

@@ -156,6 +156,7 @@ Error:
 }
 
 /**
+ * Concatenates two paths stings adding a path seperator.
  * \param[in,out]   out   Must have length of at least \a n.
  * \param[in]       n     Must be greater than the length of path1+path2+2.
  * \returns \a out on success, otherwise 0.
@@ -186,7 +187,7 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
   struct dirent *ent;
   TRY(path);
   TRY(dir=opendir(path));
-  while(ent=readdir(dir))
+  while((ent=readdir(dir)))
   { if(ent->d_type==DT_DIR)
     { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
         TRY(addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format));

@@ -1,6 +1,5 @@
 # Download and build the Google Protocol Buffers Library.
 #
-
 include(ExternalProject)
 include(FindPackageHandleStandardArgs)
 
@@ -14,22 +13,23 @@ if(NOT TARGET protobuf)
     URL_MD5 dc84e9912ea768baa1976cb7bbcea7b5
     CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
   )
-  get_target_property(PROTOBUF_ROOT_DIR protobuf _EP_INSTALL_DIR)
-  set(PROTOBUF_INCLUDE_DIR ${PROTOBUF_ROOT_DIR}/include CACHE PATH "Location of google/protobuf/message.h" FORCE)
-
-  add_library(libprotobuf STATIC IMPORTED)
-  set_target_properties(libprotobuf PROPERTIES
-    IMPORTED_LINK_INTERFACE_LANGUAGES "C"
-    IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}protobuf${CMAKE_STATIC_LIBRARY_SUFFIX}"
-  )
-  add_dependencies(libprotobuf protobuf)
-
-  add_executable(protoc IMPORTED)
-  set_target_properties(protoc PROPERTIES
-    IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/bin/protoc"
-  )
-  add_dependencies(protoc protobuf)  
 endif()
+get_target_property(PROTOBUF_ROOT_DIR protobuf _EP_INSTALL_DIR)
+set(PROTOBUF_INCLUDE_DIR ${PROTOBUF_ROOT_DIR}/include CACHE PATH "Location of google/protobuf/message.h" FORCE)
+
+add_library(libprotobuf STATIC IMPORTED)
+set_target_properties(libprotobuf PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}protobuf${CMAKE_STATIC_LIBRARY_SUFFIX}"
+)
+add_dependencies(libprotobuf protobuf)
+
+add_executable(protoc IMPORTED)
+set_target_properties(protoc PROPERTIES
+  IMPORTED_LOCATION "${PROTOBUF_ROOT_DIR}/bin/protoc"
+)
+add_dependencies(protoc protobuf)  
+
 
 set(PROTOBUF_LIBRARY libprotobuf)
 set(PROTOBUF_PROTOC_EXECUTABLE protoc)
@@ -79,7 +79,6 @@ function(PROTOBUF_GENERATE_CPP SRCS HDRS PROTOPATH)
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
       VERBATIM )
   endforeach()
-
   set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
   set(${SRCS} ${${SRCS}} PARENT_SCOPE)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)

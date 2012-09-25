@@ -56,11 +56,8 @@ typedef google::protobuf::Message      desc_t;
 // CONTEXT
 //
 
-static std::string normalize_extension(const std::string &ext)
-{ std::string out=ext;
-  if(*out.begin()=='.')
-    return out.substr(1);
-  return out;
+static const char* normalize_extension(const char *ext)
+{ return (ext[0]=='.')?(ext+1):ext;
 }
 
 struct pbufv0_t
@@ -93,11 +90,14 @@ struct pbufv0_t
    */
   std::string get_vol_path()
   { //extract the series no. from the path
-    std::string channo(".%.");
-    std::string series=path.substr(path.rfind('/')); // yields eg: "/00038"
-    std::string out(path+series+"-"+scope.file_prefix()+channo
-                    +normalize_extension(scope.stack_extension()));
-    return out;
+    const char *series=path.substr(path.rfind('/')).c_str(),
+               *prefix=scope.file_prefix().c_str(),
+               *ext=normalize_extension(scope.stack_extension().c_str());
+    char buf[1024]={0};
+    TRY(snprintf(buf,countof(buf),"%s%s-%s.%%.%s",path.c_str(),series,prefix,ext)>0);
+    return string(buf);
+Error:
+    return string("");
   }
 };
 
@@ -247,8 +247,10 @@ const char* pbufv0_name()
  */
 unsigned pbufv0_is_fmt(const char* path, const char* mode)
 { char name[1024];
+  scope_desc_t desc;
   return (find(name,sizeof(name),path,".acquisition") && 
-          find(name,sizeof(name),path,".microscope"));
+          find(name,sizeof(name),path,".microscope") &&
+          readDesc(name,&desc));
 }
 
 /** Valid modes: "r", "w", "rw" */
@@ -323,9 +325,9 @@ unsigned pbufv0_shape(metadata_t self, size_t *nelem, int64_t* shape)
   if(nelem) *nelem=3;
   if(!shape) //just set nelem and return
     return 0;
-  shape[0]=ctx->scope.fov().x_size_um();
-  shape[1]=ctx->scope.fov().y_size_um();
-  shape[2]=ctx->scope.fov().z_size_um();
+  shape[0]=ctx->scope.fov().x_size_um()*um2nm;
+  shape[1]=ctx->scope.fov().y_size_um()*um2nm;
+  shape[2]=ctx->scope.fov().z_size_um()*um2nm;
   return 1;
 }
 
@@ -365,7 +367,7 @@ ndio_t pbufv0_get_vol(metadata_t self, const char* mode)
 
 unsigned pbufv0_get_transform(metadata_t self, float *transform)
 { pbufv0_t *ctx=(pbufv0_t*)MetadataContext(self);
-  
+#if 1
   nd_t vol;  
   unsigned i,n;
   int64_t shape[3],ori[3];
@@ -414,6 +416,7 @@ unsigned pbufv0_get_transform(metadata_t self, float *transform)
 #endif
   }
   return 1;
+#endif
 Error:
   return 0;
 }

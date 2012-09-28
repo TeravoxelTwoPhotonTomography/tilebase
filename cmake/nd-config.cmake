@@ -8,7 +8,7 @@
 
 include(ExternalProject)
 include(FindPackageHandleStandardArgs)
-#find_package(Git)
+find_package(Git)
 
 set(ND_GIT_REPOSITORY ssh://git@bitbucket.org/nclack/nd.git CACHE STRING "Location of the git repository for libnd.")
 ExternalProject_Add(libnd

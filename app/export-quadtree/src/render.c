@@ -199,7 +199,7 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox)
 { nd_t v;
   int64_t *shape_nm;
   int64_t  res[]={desc->x_nm,desc->y_nm,desc->z_nm};
-  size_t ndim,i;  
+  size_t ndim,i;
   TRY(desc->nbufs>0); // must call set_ref_shape first
   TRY(v=desc->bufs[--desc->nbufs]);
 
@@ -239,8 +239,7 @@ Error:
 }
 
 static unsigned affine_workspace__gpu_resize(affine_workspace *ws, nd_t vol)
-{ 
-  if(!ws->gpu)
+{ if(!ws->gpu)
   { TRY(ws->gpu=ndcuda(vol,0));
     ws->capacity=ndnbytes(ws->gpu);
 

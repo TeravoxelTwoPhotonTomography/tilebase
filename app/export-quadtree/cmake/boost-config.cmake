@@ -34,8 +34,8 @@ else()
   set(BOOTSTRAP "bootstrap.sh;--prefix=<INSTALL_DIR>;install")
   set(B2ARGS    "install")
   set(VERDIR    ".")
-  set(DEBUG_POSTFIX)
-  set(RELEASE_POSTFIX)
+  set(DEBUG_POSTFIX "")
+  set(RELEASE_POSTFIX "")
 endif()
 
 if(NOT TARGET boost)
@@ -55,7 +55,7 @@ if(NOT TARGET boost)
 endif()
 
 get_target_property(BOOST_ROOT_DIR boost _EP_INSTALL_DIR)
-
+show(BOOST_ROOT_DIR)
 #set(BOOST_LIBRARIES PARENT_SCOPE)
 foreach(_lib chrono context date_time exception filesystem graph iostreams locale
              math_c99 math_c99f math_c99l math_tr1 math_tr1f math_tr1l
@@ -69,9 +69,12 @@ foreach(_lib chrono context date_time exception filesystem graph iostreams local
     add_dependencies(libboost_${_lib} boost)
     set_target_properties(libboost_${_lib} PROPERTIES
       IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"      
+      IMPORTED_LOCATION                 "${BOOST_ROOT_DIR}/lib/libboost_${_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}"
       IMPORTED_LOCATION_RELEASE         "${BOOST_ROOT_DIR}/lib/libboost_${_lib}${RELEASE_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}"
       IMPORTED_LOCATION_DEBUG           "${BOOST_ROOT_DIR}/lib/libboost_${_lib}${DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}"
     )
+    #get_target_property(v libboost_${_lib} LOCATION)
+    #show(v)
   endif()
 endforeach()
 

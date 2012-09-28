@@ -2,7 +2,11 @@
  * Command line option parsing.
  */
 #define NOMINMAX
+#ifdef _MSC_VER
 #include "dirent.win.h"
+#else
+#include "dirent.h"
+#endif
 #include "opts.h"
  opts_t OPTS={0}; // instance the OPTS global variable (declared in opts.h)
 #include <iostream>

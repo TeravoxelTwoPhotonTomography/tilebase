@@ -47,12 +47,15 @@ using namespace std;
 #define ZERO(type,e,nelem) memset((e),0,sizeof(type)*nelem)
 #define SAFEFREE(e)        if(e){free(e); (e)=NULL;} 
 #define countof(e)         (sizeof(e)/sizeof(*(e)))
-/// @endcond
 
 #ifdef _MSC_VER
  #define open  _open
  #define close _close
+ #define PATHSEP '\\'
+#else
+ #define PATHSEP '/'
 #endif
+/// @endcond
 
 typedef fetch::cfg::device::MicroscopeV1 scope_desc_t;
 typedef fetch::cfg::data::Acquisition  stack_desc_t;
@@ -96,7 +99,8 @@ struct pbufv1_t
    */
   std::string get_vol_path()
   { //extract the series no. from the path
-    const char *series=path.substr(path.rfind('/')).c_str(),
+    std::string ss=path.substr(path.rfind(PATHSEP));
+    const char *series=ss.c_str(),
                *prefix=scope.file_prefix().c_str(),
                *ext=normalize_extension(scope.stack_extension().c_str());
     char buf[1024]={0};
@@ -433,13 +437,13 @@ Error:
 
 /// @cond DEFINES
 #ifdef _MSC_VER
-#define shared __declspec(dllexport)
+#define shared extern "C" __declspec(dllexport)
 #else
-#define shared
+#define shared extern "C"
 #endif
 /// @endcond
 
-extern "C"
+shared
 const metadata_api_t* get_metadata_api()
 { static const metadata_api_t api =
   {   pbufv1_name,

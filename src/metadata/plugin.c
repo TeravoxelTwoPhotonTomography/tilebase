@@ -116,9 +116,12 @@ static metadata_api_t* load(const char *path, const char *fname)
 #endif
   DBG("[TRY   ] %-20s fname: %s"ENDL,path,fname);
   SILENTTRY(get=(get_metadata_api_t)GetProcAddress((HMODULE)lib,"get_metadata_api"),estring());
-  TRY(api=(metadata_api_t*)get(),fname);
+  TRY(api=(metadata_api_t*)get(),fname);  
+  //api->lib=lib; // FIXME: HAX: 
+                  // Commented out due to access violoation on windows (don't undestand...same pattern seems to work for ndio)
+                  // Not carrying the library reference, means we can't shut it down, so it "leaks."  Lifetime should be that
+                  // of the application though...at the moment, the lib is never unloaded, so this is ok.
   DBG("[ ---> ] Loaded: %s"ENDL,api->name());
-  api->lib=lib;
 Finalize:
   return api;
 Error:

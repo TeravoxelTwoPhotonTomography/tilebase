@@ -222,7 +222,7 @@ aabb_t AABBUnionIP(aabb_t dst, aabb_t src)
   TRY(dst->ndim==src->ndim);
   for(i=0;i<dst->ndim;++i)
   { int64_t d=dst->ori[i]+dst->shape[i],
-            s=dst->ori[i]+dst->shape[i],
+            s=src->ori[i]+src->shape[i],
             r=(d>s)?d:s;
     _mn(dst->ori+i,src->ori[i]);
     dst->shape[i]=r-dst->ori[i];

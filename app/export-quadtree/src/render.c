@@ -8,6 +8,7 @@
 #include "filter.h"
 #include "xform.h"
 
+
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
 #define ENDL        "\n"
@@ -20,7 +21,7 @@
 
 // === ADDRESSING A PATH IN THE TREE ===
 
-void breakme() {LOG(ENDL);}
+static void breakme() {LOG(ENDL);}
 
 /**
  * Describes a path through a tree.
@@ -32,6 +33,11 @@ struct _address_t
 
 unsigned address_id(address_t self)
 {return self->ids[self->i];}
+
+address_t address_begin(address_t self)
+{ self->i=0;
+  return self->sz?self:0;
+}
 
 address_t address_next(address_t self)
 { if(!self) return 0;
@@ -98,7 +104,7 @@ typedef struct _filter_workspace
 } filter_workspace;
 
 typedef struct _affine_workspace
-{ nd_t gpu;
+{ nd_t gpu,host_xform,gpu_xform;
   unsigned capacity;
   nd_affine_params_t params;
 } affine_workspace;
@@ -126,7 +132,7 @@ static void filter_workspace__init(filter_workspace *ws)
 
 static void affine_workspace__init(affine_workspace *ws)
 { memset(ws,0,sizeof(*ws));
-  ws->params.boundary_value=0;
+  ws->params.boundary_value=0x8000;
 };
 
 static desc_t make_desc(tiles_t tiles, float x_um, float y_um, float z_um, size_t countof_leaf, handler_t yield)
@@ -167,7 +173,7 @@ static desc_t* set_ref_shape(desc_t *desc, nd_t v)
     return desc;
   TRY(ndreshape(ndcast(desc->ref=ndinit(),ndtype(v)),ndndim(v),ndshape(v)));
   { int i;
-    ndShapeSet(ndcast(t=ndinit(),ndtype(desc->ref)),0,desc->countof_leaf);
+    TRY(ndShapeSet(ndcast(t=ndinit(),ndtype(desc->ref)),0,desc->countof_leaf));
     for(i=0;i<countof(desc->bufs);++i)
       TRY(desc->bufs[i]=ndcuda(t,0));
     desc->nbufs=countof(desc->bufs);
@@ -193,7 +199,7 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox)
 { nd_t v;
   int64_t *shape_nm;
   int64_t  res[]={desc->x_nm,desc->y_nm,desc->z_nm};
-  size_t ndim,i;
+  size_t ndim,i;  
   TRY(desc->nbufs>0); // must call set_ref_shape first
   TRY(v=desc->bufs[--desc->nbufs]);
 
@@ -202,8 +208,8 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox)
     TRY(ndShapeSet(v,i,shape_nm[i]/res[i]));
   for(;i<ndndim(desc->ref);++i) // other dimensions are same as input
     TRY(ndShapeSet(v,i,ndshape(desc->ref)[i]));
-  ndCudaSyncShape(v);
-
+  TRY(ndCudaSyncShape(v));
+  TRY(ndfill(v,desc->aws.params.boundary_value));
   return v;
 Error:
   return 0;
@@ -233,9 +239,13 @@ Error:
 }
 
 static unsigned affine_workspace__gpu_resize(affine_workspace *ws, nd_t vol)
-{ if(!ws->gpu)
+{ 
+  if(!ws->gpu)
   { TRY(ws->gpu=ndcuda(vol,0));
     ws->capacity=ndnbytes(ws->gpu);
+
+    TRY(ndreshapev(ndcast(ws->host_xform=ndinit(),nd_f32),2,ndndim(vol)+1,ndndim(vol)+1));
+    TRY(ws->gpu_xform=ndcuda(ws->host_xform,0));
   }
   if(ws->capacity<ndnbytes(vol))
     TRY(ndCudaSetCapacity(ws->gpu,ndnbytes(vol)));
@@ -252,11 +262,17 @@ nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i,ndim=ndndim(vol);
   for(i=0;i<3;++i)
     TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i])); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
-  TRY(filter_workspace__gpu_resize(ws,vol));
-  TRY(ndCudaCopy(ws->gpu[0],vol));
+  TRY(filter_workspace__gpu_resize(ws,vol));  
+  TRY(ndcopy(ws->gpu[0],vol,0,0));
+#if 0
+  ndioClose(ndioWrite(ndioOpen("aafilt-in.tif",NULL,"w"),ws->gpu[0]));
+#endif
   for(i=0;i<3;++i)
     TRY(ndconv1(ws->gpu[~i&1],ws->gpu[i&1],ws->filters[i],i,&ws->params));
   ws->i=i&1; // this will be the index of the last destination buffer  
+#if 0
+  ndioClose(ndioWrite(ndioOpen("aafilt-out.tif",NULL,"w"),ws->gpu[ws->i]));
+#endif
   return ws->gpu[ws->i];
 Error:
   for(i=0;i<countof(ws->gpu);++i) if(nderror(ws->gpu[i]))
@@ -266,8 +282,18 @@ Error:
 
 nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
 { TRY(affine_workspace__gpu_resize(ws,dst));
-  TRY(ndaffine(ws->gpu,src,transform,&ws->params));
-  ndCudaCopy(dst,ws->gpu);
+  TRY(ndref(ws->host_xform,transform,ndnelem(ws->host_xform)));
+  TRY(ndcopy(ws->gpu_xform,ws->host_xform,0,0));
+#if 0
+  ndioClose(ndioWrite(ndioOpen("xform-ws-in-transform.h5",NULL,"w"),ws->gpu_xform));
+  ndioClose(ndioWrite(ndioOpen("xform-ws-in-src.tif",NULL,"w"),src));
+  ndioClose(ndioWrite(ndioOpen("xform-ws-in-dst.tif",NULL,"w"),dst));
+#endif
+  TRY(ndaffine(dst,src,nddata(ws->gpu_xform),&ws->params));
+#if 0
+   ndioClose(ndioWrite(ndioOpen("xform-ws-out.tif",NULL,"w"),dst));
+#endif
+  //ndcopy(dst,ws->gpu,0,0); // I don't remember why I thought the temporary buffer was needed...
   return dst;
 Error:
   return 0;
@@ -296,9 +322,19 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox)
     if(!out) TRY(out=alloc_vol(desc,bbox));                                     // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TRY(ndioRead(TileFile(tiles[i]),in));
+#if 0
+    ndioClose(ndioWrite(ndioOpen("raw-in.tif",NULL,"w"),in));
+#endif
     compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,TileTransform(tiles[i]),ndndim(in));
     TRY(t=aafilt(in,desc->transform,&desc->fws));                               // t is on the gpu
+#if 0
+    ndioClose(ndioWrite(ndioOpen("buf-in.tif",NULL,"w"),out));
+    ndioClose(ndioWrite(ndioOpen("aa-out.tif",NULL,"w"),t));
+#endif
     TRY(xform(out,t,desc->transform,&desc->aws));
+#if 0
+    ndioClose(ndioWrite(ndioOpen("xform-out.tif",NULL,"w"),out));
+#endif
   }
 Finalize:
   if(nddata(in)) free(nddata(in));
@@ -351,7 +387,8 @@ static nd_t make(desc_t *desc, aabb_t bbox, address_t path)
     out=render_leaf(desc,bbox);
   else
     out=render_node(desc,bbox,path);
-  if(out) desc->yield(out,path);
+  if(out)
+    TRY(desc->yield(out,path));
   return out;
 Error:
   return 0;
@@ -371,15 +408,15 @@ Error:
 unsigned render(tiles_t tiles, float x_um, float y_um, float z_um, size_t countof_leaf, handler_t yield)
 { unsigned ok=1;
   desc_t desc=make_desc(tiles,x_um,y_um,z_um,countof_leaf,yield);
-  aabb_t bbox;
-  address_t path;
+  aabb_t bbox=0;
+  address_t path=0;
   TRY(bbox=TileBaseAABB(tiles));
   TRY(path=make_address());
   make(&desc,bbox,path);
 Finalize:
   cleanup_desc(&desc);
-  free(bbox);
-  free(path);
+  AABBFree(bbox);
+  free_address(path);
   return ok;
 Error:
   ok=0;

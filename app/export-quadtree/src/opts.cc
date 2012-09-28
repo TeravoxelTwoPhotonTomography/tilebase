@@ -199,7 +199,7 @@ unsigned parse_args(int argc, char *argv[])
       ("y_um,y",value<float>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y µm) to render.")
       ("z_um,z",value<float>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z µm) to render.")
       ("count-of-leaf,n",
-           value<HumanReadibleSize>(&g_countof_leaf)->default_value(HumanReadibleSize("0.5G")),
+           value<HumanReadibleSize>(&g_countof_leaf)->default_value(HumanReadibleSize("64M")),
            "Maximum size of leaf volume in pixels.  "
            "You may have to play with this number to get everything to fit into GPU memory."
            "It's possible to specify this in a using suffixes: k,M,G,T,P,E suffixes "

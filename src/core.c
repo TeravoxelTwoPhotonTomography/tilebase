@@ -25,18 +25,22 @@
 
 #ifdef _MSC_VER
 #include "util/dirent.win.h"
+#define PATHSEP '\\'
 #else
 #include <dirent.h>
+#define PATHSEP '/'
 #endif
 
 /// @cond DEFINES
 #define ENDL               "\n"
 #define LOG(...)           fprintf(stderr,__VA_ARGS__)
-#define TRY(e)             do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
+#define TRY(e)             do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto Error;}} while(0)
 #define NEW(type,e,nelem)  TRY((e)=(type*)malloc(sizeof(type)*(nelem)))
 #define ZERO(type,e,nelem) memset((e),0,sizeof(type)*nelem)
 #define SAFEFREE(e)        if(e){free(e); (e)=NULL;} 
 #define countof(e)         (sizeof(e)/sizeof(*(e)))
+
+static void breakme() {};
 /// @endcond
 
 struct _tile_t
@@ -82,7 +86,7 @@ tile_t TileFromFile(const char* path, const char* format)
   NEW(struct _tile_t,out,1);
   ZERO(struct _tile_t,out,1);
   TRY(meta=MetadataOpen(path,format,"r"));
-  TRY(out->aabb=AABBMake(0));
+  TRY(out->aabb=AABBMake(0)); 
   TRY(MetadataGetTileAABB(meta,out));
   TRY(out->file=MetadataOpenVolume(meta,"r"));
   TRY(out->shape=ndioShape(out->file));
@@ -164,8 +168,9 @@ Error:
 static char* join(char* out, size_t n, const char *path1, const char* path2)
 { size_t n1,n2;
   TRY(n>(n1=strlen(path1))+(n2=strlen(path2))+2); // +1 for the /, +1 for the terminating null
+  memset(out,0,n);
   strcat(out,path1);
-  strcat(out+n1,"/");
+  out[n1]=PATHSEP;
   strcat(out+n1+1,path2);
   return out;
 Error:
@@ -190,7 +195,8 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
   while((ent=readdir(dir)))
   { if(ent->d_type==DT_DIR)
     { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
-        TRY(addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format));
+        if(!addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format)) // maybe add subdirs -- some subdirs might not be valid
+          continue; 
     }
     else if(ent->d_type==DT_REG) any=1;
   }
@@ -247,7 +253,7 @@ tile_t* TileBaseArray(tiles_t self)
 /**
  * Computes the box bounding the tiles.
  * \returns 0 if error, otherwise the bounding box of the entire tile set.
- *          The caller is responsible for freeing the returned array.
+ *          The caller is responsible for freeing the returned object with AABBFree().
  */
 aabb_t TileBaseAABB(tiles_t self)
 { aabb_t out=0;

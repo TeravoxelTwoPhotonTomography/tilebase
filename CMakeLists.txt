@@ -64,6 +64,22 @@ foreach(PLUGIN ${PLUGINS})
   add_subdirectory(${PLUGIN})
 endforeach(PLUGIN)
 
+### macro for copying plugins to build products
+macro(tilebase_copy_plugins_to_target _target)
+  foreach(PLUGIN ${PLUGINS})
+    get_filename_component(_plugin_tgt ${PLUGIN} NAME)
+    get_target_property(loc ${_plugin_tgt} LOCATION)
+    add_custom_command(TARGET ${_target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${_target}>/plugins
+      COMMAND ${CMAKE_COMMAND} -E copy
+          $<TARGET_FILE:${_plugin_tgt}>
+          $<TARGET_FILE_DIR:${_target}>/plugins
+          COMMENT "Copying ${_plugin_tgt} to build path for ${_target}."
+          )  
+    add_dependencies(${_target} v)
+  endforeach()
+endmacro()
+
 ### APPS ###
 add_subdirectory(app/export-quadtree)
 
@@ -90,6 +106,7 @@ if(GTEST_FOUND AND TEST_SOURCES)
     gtest
     ${PLUGINS}
   )
+  nd_copy_plugins_to_target(test-tilebase)
   add_test(TestTilebase test-tilebase)
   install(TARGETS test-tilebase
           RUNTIME DESTINATION bin)

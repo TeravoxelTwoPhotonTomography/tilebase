@@ -41,14 +41,16 @@ Error:
  * at \a v.
  */
 static nd_t normpdf(nd_t x,float mu, float sigma)
-{ const float norm=1.0/sigma*SQRT_2PI;
-  float*restrict d=nddata(x);
+{ float norm=0.0;
+  float*restrict d=(float*)nddata(x);
   size_t i,n=ndnelem(x);
   TRY(ndtype(x)==nd_f32);
   for(i=0;i<n;++i)
   { float v=(d[i]-mu)/sigma;
-    d[i]=norm*exp(-0.5*v*v);
+    d[i]=exp(-0.5*v*v);
   }
+  for(i=0;i<n;++i) norm+=d[i];
+  for(i=0;i<n;++i) d[i]/=norm;
   return x;
 Error:
   return 0;
@@ -56,7 +58,7 @@ Error:
 
 /** single valued normal probability desnity */
 static float _normpdf(float v, float mu, float sigma)
-{ const float norm=1.0/sigma*SQRT_2PI;
+{ const float norm=1.0/sigma/SQRT_2PI;
   v=(v-mu)/sigma;
   return norm*exp(-0.5*v*v);
 }
@@ -86,6 +88,9 @@ nd_t make_aa_filter(float scale,nd_t workspace)
     TRY(ndref(out,realloc(nddata(out),n*sizeof(float)),n));
   linspace(out,-(float)r,r);
   normpdf(out,0.0f,scale/2.0);
+#if 0
+  ndioClose(ndioWrite(ndioOpen("filter.h5",0,"w"),out));
+#endif
   return out;
 Error:
   return 0;

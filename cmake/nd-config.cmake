@@ -74,3 +74,16 @@ endforeach()
 #       Probably have to do a cmake -P special.cmake and install(CODE)
 file(GLOB EXTRAS ${ND_ROOT_DIR}/bin/*${CMAKE_SHARED_MODULE_SUFFIX})
 install(FILES ${EXTRAS} DESTINATION bin)
+
+#show(ND_PLUGINS)
+### macro for copying plugins to a target's build Location
+macro(nd_copy_plugins_to_target _target)
+    #show(_target)
+    add_custom_command(TARGET ${_target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${ND_ROOT_DIR}/bin/plugins
+          $<TARGET_FILE_DIR:${_target}>/plugins
+          COMMENT "Copying libnd plugins to build path for ${_target}."
+          )  
+    add_dependencies(${_target} libnd)
+endmacro()

@@ -16,4 +16,6 @@ target_link_libraries(${_target}
   ${BOOST_LIBRARIES}
   tilebase
   )
+tilebase_copy_plugins_to_target(export-quadtree)
+nd_copy_plugins_to_target(export-quadtree)
 install(TARGETS ${_target} RUNTIME DESTINATION bin)

@@ -14,7 +14,11 @@
 
 #define countof(e) (sizeof(e)/sizeof(*e))
 
+#ifdef _MSC_VER
+#define PATHSEP  '\\'
+#else
 #define PATHSEP  '/'
+#endif
 #define ENDL     "\n"
 #define LOG(...) fprintf(stderr,__VA_ARGS__) 
 #define TRY(e)   do{if(!(e)) { DBG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
@@ -34,7 +38,8 @@
  */
 char* address_to_path(char* path, int n, address_t address)
 { unsigned i,k;
-  while((address=address_next(address)) && n>=0)
+  //while((address=address_next(address)) && n>=0)
+  for(address=address_begin(address);address&&n>=0;address=address_next(address))
   { k=snprintf(path,n,"%u%c",address_id(address),PATHSEP);
     path+=k;
     n-=k;
@@ -45,9 +50,12 @@ char* address_to_path(char* path, int n, address_t address)
 unsigned save(nd_t vol, address_t address)
 { char full[1024]={0},
        path[1024]={0};  
-  TRY(mkpath(address_to_path(path,countof(path),address)));
-  TRY(snprintf(full,countof(full),"%s%c%s%c%s",
-    OPTS.dst,PATHSEP,path,PATHSEP,OPTS.dst_pattern));
+  size_t n;
+  TRY(address_to_path(path,countof(path),address));
+  TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);
+  printf("SAVING %s"ENDL,full);
+  TRY(mkpath(full));
+  TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   ndioClose(ndioWrite(ndioOpen(full,"series","w"),vol));
   return 1;
 Error:
@@ -55,14 +63,15 @@ Error:
 }
 
 int main(int argc, char* argv[])
-{ unsigned ecode=0;
+{ unsigned ecode=0; 
   tiles_t tiles=0;
   TRY(parse_args(argc,argv));
   printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
   TRY(render(tiles,OPTS.x_um,OPTS.y_um,OPTS.z_um,OPTS.countof_leaf,save));
 Finalize:
-  TileBaseClose(tiles);
+  TileBaseClose(tiles); 
+  LOG("Press <ENTER>"ENDL); getchar();
   return ecode;
 Error:
   ecode=1;

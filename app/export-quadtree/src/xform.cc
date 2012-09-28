@@ -1,5 +1,6 @@
 /**
  * Computing transforms.
+ * \todo should be smarter about dimensions...what if 2d data, what if 3d+time?
  */
 #include <stdlib.h>
 #include <stdint.h>
@@ -10,6 +11,8 @@
 using namespace Eigen;
 #include <iostream>
 using namespace std;
+
+//#define DEBUG
 
 #ifndef restrict
   #define restrict __restrict
@@ -34,19 +37,21 @@ void compose(float *restrict out,
   Map<Matrix<float,Dynamic,Dynamic,RowMajor> > src2world(transform,ndim+1,ndim+1);
   Map<Matrix<float,Dynamic,Dynamic,RowMajor> > T(out,ndim+1,ndim+1);
 
-  int64_t      *s;
-  AABBGet(bbox,0,0,&s);
+  int64_t      *o;
+  AABBGet(bbox,0,&o,0);
   dst2world.setIdentity();
-  dst2world.block<3,1>(0,ndim)<<(float)s[0],(float)s[1],(float)s[2];
+  dst2world.block<3,1>(0,ndim)<<(float)o[0],(float)o[1],(float)o[2];
   dst2world.block<3,3>(0,0).diagonal()<<sx,sy,sz;  
 
   T=(src2world.inverse()*dst2world).eval();
+#ifdef DEBUG
   #define show(e) cout<<#e" is "<<endl<<e<<endl<<endl
   show(dst2world);
   show(src2world);
   show(src2world.inverse());
   show(T);
   #undef show
+#endif
 }
 
 extern "C"
@@ -56,15 +61,17 @@ void box2box(float *restrict out,
 { size_t d;
   int64_t *shape;
   
-  AABBGet(srcbox,&d,0,&shape);
-  MatrixXf src2world(d+1,ndndim(src)+1);
+  AABBGet(srcbox,0,0,&shape);
+  d=ndndim(src);
+  MatrixXf src2world(d+1,d+1);
   src2world.setIdentity().block<3,3>(0,0).diagonal()
     << (float)shape[0]/(float)ndshape(src)[0],
        (float)shape[1]/(float)ndshape(src)[1],
        (float)shape[2]/(float)ndshape(src)[2];
 
-  AABBGet(dstbox,&d,0,&shape);
-  MatrixXf dst2world(d+1,ndndim(dst)+1);
+  AABBGet(dstbox,0,0,&shape);
+  d=ndndim(dst);
+  MatrixXf dst2world(d+1,d+1);
   dst2world.setIdentity().block<3,3>(0,0).diagonal()
     << (float)shape[0]/(float)ndshape(dst)[0],
        (float)shape[1]/(float)ndshape(dst)[1],

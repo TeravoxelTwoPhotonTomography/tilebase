@@ -47,12 +47,15 @@ using namespace std;
 #define ZERO(type,e,nelem) memset((e),0,sizeof(type)*nelem)
 #define SAFEFREE(e)        if(e){free(e); (e)=NULL;} 
 #define countof(e)         (sizeof(e)/sizeof(*(e)))
-/// @endcond
 
 #ifdef _MSC_VER
  #define open  _open
  #define close _close
+ #define PATHSEP '\\'
+#else
+ #define PATHSEP '/'
 #endif
+/// @endcond
 
 typedef fetch::cfg::device::Microscope scope_desc_t;
 typedef fetch::cfg::data::Acquisition  stack_desc_t;
@@ -76,7 +79,7 @@ struct pbufv0_t
   pbufv0_t(const char* _path):read_mode(0),write_mode(0),path(_path) 
   { // clean path of the trailing path seperator if it's there
     char e= *path.rbegin();
-    if(e=='/') // assume unix-style path seperators
+    if(e==PATHSEP)
       path=path.substr(0,path.size()-1);
   }
 
@@ -96,7 +99,8 @@ struct pbufv0_t
    */
   std::string get_vol_path()
   { //extract the series no. from the path
-    const char *series=path.substr(path.rfind('/')).c_str(),
+    std::string ss=path.substr(path.rfind(PATHSEP));
+    const char *series=ss.c_str(),
                *prefix=scope.file_prefix().c_str(),
                *ext=normalize_extension(scope.stack_extension().c_str());
     char buf[1024]={0};
@@ -387,8 +391,9 @@ unsigned pbufv0_get_transform(metadata_t self, float *transform)
   TRY(pbufv0_shape(self,NULL,shape));
   TRY(pbufv0_origin(self,NULL,ori));
 
-  { MatrixXf         center(n+1,n+1),stage(n+1,n+1),S(n+1,n+1),R(n+1,n+1);
+  { MatrixXf center(n+1,n+1),stage(n+1,n+1),S(n+1,n+1),R(n+1,n+1),F(n+1,n+1);
 
+    F.setIdentity().block<3,3>(0,0).diagonal() << 1.0f,-1.0f,1.0f;
     R.setIdentity().block<3,3>(0,0)=AngleAxisf(ctx->scope.fov().rotation_radians(),Vector3f(0,0,1)).matrix();
     center.setIdentity().block<3,1>(0,n)
         << (-(float)ndshape(vol)[0]/2.0f),
@@ -400,20 +405,22 @@ unsigned pbufv0_get_transform(metadata_t self, float *transform)
            (float)ori[2];
     S.setIdentity().block<3,3>(0,0).diagonal()
         <<  shape[0]/(float)ndshape(vol)[0],
-           -shape[1]/(float)ndshape(vol)[1], // flip y
+            shape[1]/(float)ndshape(vol)[1], // flip y
             shape[2]/(float)ndshape(vol)[2];
 
     Map<Matrix<float,Dynamic,Dynamic,RowMajor> > M(transform,n+1,n+1);
     M.setIdentity();
     M(2,1)=1.0/(float)ndshape(vol)[1]; // shear parallel to z by y: 1 plane along length of 1
-    M=(stage              // translate to stage origin
-      *R                  // rotate field
+    M=(stage              // translate to stage origin      
       *S                  // scale to physical coordinates (and flip)
+      *center.inverse()   // move back to stack origin
+      *R*F                // rotate and flip field
       *center             // Move origin to optical axis, begining of zpiezo movement
       *M).eval(); // pixels
 #ifdef DEBUG
 #define show(v) cout<<#v": "<<endl<<(v)<<endl<<endl
     show(R);
+    show(F);
     show(center);
     show(stage);
     show(S);
@@ -433,16 +440,16 @@ Error:
 
 /// @cond DEFINES
 #ifdef _MSC_VER
-#define shared __declspec(dllexport)
+#define shared extern "C" __declspec(dllexport)
 #else
-#define shared
+#define shared extern "C"
 #endif
 /// @endcond
 
-extern "C"
+shared
 const metadata_api_t* get_metadata_api()
 { static const metadata_api_t api =
-	{   pbufv0_name,
+  {   pbufv0_name,
       pbufv0_is_fmt,
       pbufv0_open,
       pbufv0_close,
@@ -454,6 +461,6 @@ const metadata_api_t* get_metadata_api()
       pbufv0_get_transform,
       ndioAddPlugin,
       NULL
-	};
+  };
   return &api;
 }

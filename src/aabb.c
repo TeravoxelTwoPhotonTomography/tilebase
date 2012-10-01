@@ -231,3 +231,14 @@ aabb_t AABBUnionIP(aabb_t dst, aabb_t src)
 Error:
   return 0;
 }
+
+/**
+ * Returns the volume of the bounding box in physical units (nanometers).
+ */
+int64_t AABBVolume(aabb_t self)
+{ int64_t v=1;
+  unsigned i;
+  for(i=0;i<self->ndim;++i)
+    v*=self->shape[i];
+  return v;
+}

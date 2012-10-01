@@ -7,7 +7,9 @@
 #include "tilebase.h"
 #include "src/opts.h"
 #include "src/render.h"
+#include "Src/address.h"
 #include "src/mkpath.h"
+
 #ifdef _MSC_VER
 #define snprintf _snprintf
 #endif
@@ -37,13 +39,15 @@
  * \param[in] address The address to render.
  */
 char* address_to_path(char* path, int n, address_t address)
-{ unsigned i,k;
-  //while((address=address_next(address)) && n>=0)
+{ unsigned k;
+  char *op=path;
   for(address=address_begin(address);address&&n>=0;address=address_next(address))
   { k=snprintf(path,n,"%u%c",address_id(address),PATHSEP);
     path+=k;
     n-=k;
   }
+  // remove terminal path separator
+  if(path!=op) path[-1]='\0';
   return (n>=0)?path:0;
 }
 

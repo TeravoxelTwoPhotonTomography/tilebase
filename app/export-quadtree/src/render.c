@@ -7,7 +7,8 @@
 #include "render.h"
 #include "filter.h"
 #include "xform.h"
-
+#include "address.h"
+#include <math.h> //for sqrt
 
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
@@ -19,79 +20,19 @@
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
+//#define DEBUG
+//#define DEBUG_DUMP_IMAGES
+#ifdef DEBUG
+#define DBG(...) LOG(__VA_ARGS__)
+#else
+#define DBG(...)
+#endif
+
+
 // === ADDRESSING A PATH IN THE TREE ===
 
 static void breakme() {LOG(ENDL);}
 
-/**
- * Describes a path through a tree.
- */
-struct _address_t
-{ int *ids;
-  unsigned sz,cap,i;
-};
-
-unsigned address_id(address_t self)
-{return self->ids[self->i];}
-
-address_t address_begin(address_t self)
-{ self->i=0;
-  return self->sz?self:0;
-}
-
-address_t address_next(address_t self)
-{ if(!self) return 0;
-  ++self->i;
-  return (self->i<self->sz)?self:0;
-}
-
-static
-address_t make_address()
-{ address_t out=0;
-  NEW(struct _address_t,out,1);
-  ZERO(struct _address_t,out,1);
-  return out;
-Error:
-  return 0;
-}
-
-static
-void free_address(address_t self)
-{ if(!self) return;
-  if(self->ids) free(self->ids);
-  free(self);
-}
-
-#if 0
-static
-address_t address_copy(address_t src)
-{ address_t out;
-  TRY(out=make_address());
-  memcpy(out,src,sizeof(struct _address_t));
-  NEW(int,out->ids,out->cap);
-  memcpy(out->ids,src->ids,sizeof(int)*src->sz);
-  return out;
-Error:
-  return 0;
-}
-#endif
-
-static
-address_t address_push(address_t self, int i)
-{ if(self->sz+1>=self->cap)
-    REALLOC(int,self->ids,self->cap=1.2*self->cap+10);
-  self->ids[self->sz++]=i;
-  return self;
-Error:
-  return 0;
-}
-
-static
-address_t address_pop(address_t self)
-{ if(self->sz==0) return 0;
-  self->sz--;
-  return self;
-}
 
 // === RENDERING ===
 
@@ -104,22 +45,20 @@ typedef struct _filter_workspace
 } filter_workspace;
 
 typedef struct _affine_workspace
-{ nd_t gpu,host_xform,gpu_xform;
-  unsigned capacity;
+{ nd_t host_xform,gpu_xform;
   nd_affine_params_t params;
 } affine_workspace;
 
 /// Common arguments and memory context used for building the tree
 typedef struct _desc_t
 { tiles_t tiles;
-  float x_nm,y_nm,z_nm;
+  float x_nm,y_nm,z_nm,voxvol_nm3;
   size_t countof_leaf;
   handler_t yield;
 
-  aabb_t cboxes[4];
   nd_t ref;
-  nd_t bufs[5]; //1+4
-  int nbufs;
+  nd_t bufs[8]; //2*4 bufs - octree would be 2*8
+  int  inuse[8];
   filter_workspace fws;
   affine_workspace aws;
   float *transform;
@@ -137,7 +76,6 @@ static void affine_workspace__init(affine_workspace *ws)
 
 static desc_t make_desc(tiles_t tiles, float x_um, float y_um, float z_um, size_t countof_leaf, handler_t yield)
 { const float um2nm=1e3;
-  unsigned i;
 
   desc_t out;
   memset(&out,0,sizeof(out));
@@ -145,15 +83,12 @@ static desc_t make_desc(tiles_t tiles, float x_um, float y_um, float z_um, size_
   out.x_nm=x_um*um2nm;
   out.y_nm=y_um*um2nm;
   out.z_nm=z_um*um2nm;
+  out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
   out.countof_leaf=countof_leaf;
   out.yield=yield;
   filter_workspace__init(&out.fws);
   affine_workspace__init(&out.aws);
 
-  { int i;
-    for(i=0;i<countof(out.cboxes);++i)
-      out.cboxes[i]=AABBMake(3);
-  }
   return out;
 }
 
@@ -163,8 +98,6 @@ static void cleanup_desc(desc_t *desc)
   for(i=0;i<countof(desc->bufs);++i)
     ndfree(desc->bufs[i]);
   if(desc->transform) free(desc->transform);
-  for(i=0;i<countof(desc->cboxes);++i)
-    AABBFree(desc->cboxes[i]);
 }
 
 static desc_t* set_ref_shape(desc_t *desc, nd_t v)
@@ -176,7 +109,6 @@ static desc_t* set_ref_shape(desc_t *desc, nd_t v)
     TRY(ndShapeSet(ndcast(t=ndinit(),ndtype(desc->ref)),0,desc->countof_leaf));
     for(i=0;i<countof(desc->bufs);++i)
       TRY(desc->bufs[i]=ndcuda(t,0));
-    desc->nbufs=countof(desc->bufs);
   }
   return desc;
 Error:
@@ -185,39 +117,40 @@ Error:
 }
 
 static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
-{ int64_t *shape_nm=0;
-  float nm2um=1e-3;
-  size_t ndim,c=1;
-  AABBGet(bbox,&ndim,0,&shape_nm);
-  c*=shape_nm[0]/desc->x_nm;
-  c*=shape_nm[1]/desc->y_nm;
-  c*=shape_nm[2]/desc->z_nm;
-  return c<desc->countof_leaf;
+{ int64_t c=AABBVolume(bbox)/(int64_t)desc->voxvol_nm3;
+  return c<(int64_t)desc->countof_leaf;
 }
 
-static nd_t alloc_vol(desc_t *desc, aabb_t bbox)
+static nd_t alloc_vol(desc_t *desc, aabb_t bbox, int64_t x_nm, int64_t y_nm, int64_t z_nm)
 { nd_t v;
   int64_t *shape_nm;
-  int64_t  res[]={desc->x_nm,desc->y_nm,desc->z_nm};
-  size_t ndim,i;  
-  TRY(desc->nbufs>0); // must call set_ref_shape first
-  TRY(v=desc->bufs[--desc->nbufs]);
+  int64_t  res[]={x_nm,y_nm,z_nm};
+  size_t ndim,i;
+  for(i=0;i<countof(desc->bufs) && desc->inuse[i];++i); // search for first unused
+  TRY(i<countof(desc->bufs));                           // check that one was available  
+  TRY(v=desc->bufs[i]);                                 // ensure bufs was init'd - see set_ref_shape()
+  desc->inuse[i]=1;
+  DBG("-- alloc_vol(): buf=%d"ENDL,i);
 
   AABBGet(bbox,&ndim,0,&shape_nm);
   for(i=0;i<ndim;++i) // set spatial dimensions
     TRY(ndShapeSet(v,i,shape_nm[i]/res[i]));
   for(;i<ndndim(desc->ref);++i) // other dimensions are same as input
-    TRY(ndShapeSet(v,i,ndshape(desc->ref)[i]));
+    TRY(ndShapeSet(v,(unsigned)i,ndshape(desc->ref)[i]));
   TRY(ndCudaSyncShape(v));
-  TRY(ndfill(v,desc->aws.params.boundary_value));
+  TRY(ndfill(v,desc->aws.params.boundary_value));  
   return v;
 Error:
   return 0;
 }
 
 static unsigned release_vol(desc_t *desc,nd_t a)
-{ TRY(desc->nbufs<countof(desc->bufs));
-  desc->nbufs++;
+{ size_t i;
+  for(i=0;i<countof(desc->bufs) && desc->bufs[i]!=a;++i); // search for buffer corresponding to a
+  TRY(i<countof(desc->bufs));                             // ensure one was found
+  TRY(desc->inuse[i]);                                    // ensure it was marked inuse. (sanity check)
+  desc->inuse[i]=0;
+  DBG("-- release_vol(): buf=%d"ENDL,i);
   return 1;
 Error:
   return 0;
@@ -227,12 +160,16 @@ static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
 { if(!ws->gpu[0])
   { TRY(ws->gpu[0]=ndcuda(vol,0));
     TRY(ws->gpu[1]=ndcuda(vol,0));
-    ws->capacity=ndnbytes(ws->gpu[0]);
+    ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
   if(ws->capacity<ndnbytes(vol))
   { TRY(ndCudaSetCapacity(ws->gpu[0],ndnbytes(vol)));
     TRY(ndCudaSetCapacity(ws->gpu[1],ndnbytes(vol)));
   }
+  ndreshape(ws->gpu[0],ndndim(vol),ndshape(vol));
+  ndreshape(ws->gpu[1],ndndim(vol),ndshape(vol));
+  ndCudaSyncShape(ws->gpu[0]);
+  ndCudaSyncShape(ws->gpu[1]);
   return 1;
 Error:
   return 0;
@@ -240,22 +177,20 @@ Error:
 
 static unsigned affine_workspace__gpu_resize(affine_workspace *ws, nd_t vol)
 { 
-  if(!ws->gpu)
-  { TRY(ws->gpu=ndcuda(vol,0));
-    ws->capacity=ndnbytes(ws->gpu);
-
-    TRY(ndreshapev(ndcast(ws->host_xform=ndinit(),nd_f32),2,ndndim(vol)+1,ndndim(vol)+1));
+  if(!ws->gpu_xform)
+  { TRY(ndreshapev(ndcast(ws->host_xform=ndinit(),nd_f32),2,ndndim(vol)+1,ndndim(vol)+1));
     TRY(ws->gpu_xform=ndcuda(ws->host_xform,0));
   }
-  if(ws->capacity<ndnbytes(vol))
-    TRY(ndCudaSetCapacity(ws->gpu,ndnbytes(vol)));
   return 1;
 Error:
   return 0;
 }
 
 /**
- * Anti-aliasing filter. 
+ * Anti-aliasing filter. Uses seperable convolutions.
+ * Uses double-buffering.  The two buffers are tracked by the filter_workspace.
+ * The final buffer is returned as the result.  It is managed by the workspace.
+ * The caller should not free it.
  * \todo FIXME: assumes working with at-least-3d data.
  */
 nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
@@ -264,15 +199,9 @@ nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
     TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i])); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TRY(filter_workspace__gpu_resize(ws,vol));  
   TRY(ndcopy(ws->gpu[0],vol,0,0));
-#if 0
-  ndioClose(ndioWrite(ndioOpen("aafilt-in.tif",NULL,"w"),ws->gpu[0]));
-#endif
   for(i=0;i<3;++i)
     TRY(ndconv1(ws->gpu[~i&1],ws->gpu[i&1],ws->filters[i],i,&ws->params));
-  ws->i=i&1; // this will be the index of the last destination buffer  
-#if 0
-  ndioClose(ndioWrite(ndioOpen("aafilt-out.tif",NULL,"w"),ws->gpu[ws->i]));
-#endif
+  ws->i=i&1; // this will be the index of the last destination buffer
   return ws->gpu[ws->i];
 Error:
   for(i=0;i<countof(ws->gpu);++i) if(nderror(ws->gpu[i]))
@@ -284,16 +213,7 @@ nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
 { TRY(affine_workspace__gpu_resize(ws,dst));
   TRY(ndref(ws->host_xform,transform,ndnelem(ws->host_xform)));
   TRY(ndcopy(ws->gpu_xform,ws->host_xform,0,0));
-#if 0
-  ndioClose(ndioWrite(ndioOpen("xform-ws-in-transform.h5",NULL,"w"),ws->gpu_xform));
-  ndioClose(ndioWrite(ndioOpen("xform-ws-in-src.tif",NULL,"w"),src));
-  ndioClose(ndioWrite(ndioOpen("xform-ws-in-dst.tif",NULL,"w"),dst));
-#endif
   TRY(ndaffine(dst,src,nddata(ws->gpu_xform),&ws->params));
-#if 0
-   ndioClose(ndioWrite(ndioOpen("xform-ws-out.tif",NULL,"w"),dst));
-#endif
-  //ndcopy(dst,ws->gpu,0,0); // I don't remember why I thought the temporary buffer was needed...
   return dst;
 Error:
   return 0;
@@ -319,22 +239,12 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox)
       NEW(float,desc->transform,(n+1)*(n+1));
       TRY(set_ref_shape(desc,in));
     }
-    if(!out) TRY(out=alloc_vol(desc,bbox));                                     // Alloc on first iteration: out, must come after set_ref_shape
+    if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TRY(ndioRead(TileFile(tiles[i]),in));
-#if 0
-    ndioClose(ndioWrite(ndioOpen("raw-in.tif",NULL,"w"),in));
-#endif
     compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,TileTransform(tiles[i]),ndndim(in));
     TRY(t=aafilt(in,desc->transform,&desc->fws));                               // t is on the gpu
-#if 0
-    ndioClose(ndioWrite(ndioOpen("buf-in.tif",NULL,"w"),out));
-    ndioClose(ndioWrite(ndioOpen("aa-out.tif",NULL,"w"),t));
-#endif
     TRY(xform(out,t,desc->transform,&desc->aws));
-#if 0
-    ndioClose(ndioWrite(ndioOpen("xform-out.tif",NULL,"w"),out));
-#endif
   }
 Finalize:
   if(nddata(in)) free(nddata(in));
@@ -357,18 +267,29 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
   nd_t cs[4];
   unsigned i,any=0;
   nd_t out,t;
-
-  TRY(AABBBinarySubdivision(desc->cboxes,4,bbox));
+  aabb_t cboxes[4]={0};
+  size_t ndim;
+  TRY(AABBBinarySubdivision(cboxes,4,bbox));
   for(i=0;i<4;++i)
   { TRY(address_push(path,i));
-    cs[i]=make(desc,desc->cboxes[i],path);
+    cs[i]=make(desc,cboxes[i],path);
     TRY(address_pop(path));
     any|=(cs[i]!=0);
   }
   if(!any) return 0;
-  TRY(out=alloc_vol(desc,bbox));
+
+  { int64_t *cshape_nm;
+    AABBGet(cboxes[0],0,0,&cshape_nm);
+    TRY(out=alloc_vol(desc,bbox,
+      2.0f*cshape_nm[0]/ndshape(cs[0])[0],
+      2.0f*cshape_nm[1]/ndshape(cs[0])[1],
+      cshape_nm[2]/ndshape(cs[0])[2]));
+  }
+  ndim=ndndim(out);
   for(i=0;i<4;++i)
-  { box2box(desc->transform,out,bbox,cs[i],desc->cboxes[i]);
+  { 
+    box2box(desc->transform,out,bbox,cs[i],cboxes[i]);
+    AABBFree(cboxes[i]);
     TRY(t=aafilt(cs[i],desc->transform,&desc->fws));
     release_vol(desc,cs[i]);
     TRY(xform(out,t,desc->transform,&desc->aws));

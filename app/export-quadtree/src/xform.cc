@@ -59,25 +59,37 @@ void box2box(float *restrict out,
              nd_t dst, aabb_t dstbox,
              nd_t src, aabb_t srcbox)
 { size_t d;
-  int64_t *shape;
+  int64_t *ori,*shape;
   
-  AABBGet(srcbox,0,0,&shape);
+  AABBGet(srcbox,0,&ori,&shape);
   d=ndndim(src);
   MatrixXf src2world(d+1,d+1);
   src2world.setIdentity().block<3,3>(0,0).diagonal()
     << (float)shape[0]/(float)ndshape(src)[0],
        (float)shape[1]/(float)ndshape(src)[1],
        (float)shape[2]/(float)ndshape(src)[2];
+  src2world.block<3,1>(0,d)
+    << (float)ori[0],(float)ori[1],(float)ori[2];
 
-  AABBGet(dstbox,0,0,&shape);
+  AABBGet(dstbox,0,&ori,&shape);
   d=ndndim(dst);
   MatrixXf dst2world(d+1,d+1);
   dst2world.setIdentity().block<3,3>(0,0).diagonal()
     << (float)shape[0]/(float)ndshape(dst)[0],
        (float)shape[1]/(float)ndshape(dst)[1],
        (float)shape[2]/(float)ndshape(dst)[2];
+  dst2world.block<3,1>(0,d)
+    << (float)ori[0],(float)ori[1],(float)ori[2];
 
   Map<Matrix<float,Dynamic,Dynamic,RowMajor> > T(out,ndndim(src)+1,ndndim(dst)+1);
   T=src2world.inverse()*dst2world;
+#ifdef DEBUG
+  #define show(e) cout<<#e" is "<<endl<<e<<endl<<endl
+  show(dst2world);
+  show(src2world);
+  show(src2world.inverse());
+  show(T);
+  #undef show
+#endif
   //  [s,r_s] x [r_d,d]; r_s == r_d
 }

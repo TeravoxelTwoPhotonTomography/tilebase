@@ -17,6 +17,7 @@
 #define countof(e) (sizeof(e)/sizeof(*e))
 
 #ifdef _MSC_VER
+#pragma warning (disable:4996) // deprecation warning for sprintf
 #define PATHSEP  '\\'
 #else
 #define PATHSEP  '/'
@@ -70,7 +71,7 @@ int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
   TRY(parse_args(argc,argv));
-  printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
+  //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
   TRY(render(tiles,OPTS.x_um,OPTS.y_um,OPTS.z_um,OPTS.countof_leaf,save));
 Finalize:

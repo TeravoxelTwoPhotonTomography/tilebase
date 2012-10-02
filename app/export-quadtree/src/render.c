@@ -10,6 +10,8 @@
 #include "address.h"
 #include <math.h> //for sqrt
 
+#include "tictoc.h" // for profiling
+
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
 #define ENDL        "\n"
@@ -20,7 +22,7 @@
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
-//#define DEBUG
+#define DEBUG
 //#define DEBUG_DUMP_IMAGES
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)
@@ -195,7 +197,7 @@ Error:
  */
 nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i,ndim=ndndim(vol);
-  for(i=0;i<3;++i)
+  for(i=0;i<3;++i) 
     TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i])); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TRY(filter_workspace__gpu_resize(ws,vol));  
   TRY(ndcopy(ws->gpu[0],vol,0,0));

@@ -30,10 +30,14 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   set(PROTO_DIR ${PROJECT_SOURCE_DIR}/protos)
   file(GLOB PROTOS ${PROTO_DIR}/*.proto)
   PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTO_DIR} ${PROTOS})
+  source_group("Header Files\\Protobuf Generated" FILES ${PROTO_HDRS})
+  source_group("Source Files\\Protobuf Generated" FILES ${PROTO_SRCS})
+  source_group("Protobuf Files" FILES ${PROTOS})
 
   set(CFG ${PROJECT_BINARY_DIR}/config.h config.h.in)
 
   set(ALL ${SRCS} ${HDRS} ${PROTOS} ${PROTO_SRCS} ${PROTO_HDRS})
+  
 
   ##############################################################################
   # TARGETS

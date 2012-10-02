@@ -94,6 +94,7 @@ tile_t TileFromFile(const char* path, const char* format)
   NEW(float,out->transform,(n+1)*(n+1));
   TRY(MetadataGetTransform(meta,out->transform));
   MetadataClose(meta);
+  LOG("TileBase: Loaded %s"ENDL,path);
   return out;
 Error:
   MetadataClose(meta);

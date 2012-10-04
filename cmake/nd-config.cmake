@@ -73,7 +73,9 @@ endforeach()
 # TODO: How to get the list without building once?
 #       Probably have to do a cmake -P special.cmake and install(CODE)
 file(GLOB EXTRAS ${ND_ROOT_DIR}/bin/*${CMAKE_SHARED_MODULE_SUFFIX})
+file(GLOB PLUGIN_EXTRAS ${ND_ROOT_DIR}/bin/plugins/*${CMAKE_SHARED_MODULE_SUFFIX})
 install(FILES ${EXTRAS} DESTINATION bin)
+install(FILES ${PLUGIN_EXTRAS} DESTINATION bin/plugins)
 
 #show(ND_PLUGINS)
 ### macro for copying plugins to a target's build Location

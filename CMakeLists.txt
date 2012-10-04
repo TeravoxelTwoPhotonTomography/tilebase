@@ -18,6 +18,9 @@ endmacro()
 
 set(TILEBASE_PLUGIN_PATH plugins)
 
+find_package(YAML CONFIG PATHS cmake)
+include_directories(${YAML_INCLUDE_DIRS})
+
 find_package(ND CONFIG PATHS cmake)
 include_directories(${ND_INCLUDE_DIRS})
 
@@ -37,7 +40,7 @@ endif()
 ################################################################################
 
 include_directories(${PROJECT_SOURCE_DIR})
-file(GLOB SRCS src/*.c src/metadata/*.c)
+file(GLOB SRCS src/*.c src/*.cc src/metadata/*.c)
 file(GLOB HDRS src/*.h src/metadata/*.h src/util/*.h)
 
 ################################################################################
@@ -56,6 +59,7 @@ target_link_libraries(tilebase
   ${ND_LIBRARIES}
   ${CMAKE_DL_LIBS}
   ${SHLWAPI}
+  ${YAML_LIBRARIES}
 )
 
 # tile metadata plugins
@@ -82,6 +86,7 @@ endmacro()
 
 ### APPS ###
 add_subdirectory(app/export-quadtree)
+add_subdirectory(app/tilebase-cache-build)
 
 ###############################################################################
 #  Testing

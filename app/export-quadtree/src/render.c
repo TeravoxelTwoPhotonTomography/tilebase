@@ -22,7 +22,7 @@
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
-#define DEBUG
+//#define DEBUG
 //#define DEBUG_DUMP_IMAGES
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)

@@ -22,6 +22,8 @@
 #include "metadata/metadata.h"
 #include <stdio.h>
 #include <string.h>
+#include "cache.h"
+#include "core.priv.h" // defines tile_t and tiles_t structs
 
 #ifdef _MSC_VER
 #include "util/dirent.win.h"
@@ -43,20 +45,6 @@
 static void breakme() {};
 /// @endcond
 
-struct _tile_t
-{ aabb_t aabb;  ///< bounding box for the tile
-  ndio_t file;  ///< opened file for reading
-  nd_t   shape;
-  float* transform;
-};
-
-struct _tiles_t
-{ tile_t *tiles;  ///< tiles array
-  size_t  sz,     ///< tiles array length
-          cap;    ///< tiles array capacity
-//  char   *log;    ///< error log (NULL if no errors)
-};
-
 //
 // === TILE API ===
 //
@@ -67,6 +55,7 @@ void TileFree(tile_t self)
   ndioClose(self->file);
   ndfree(self->shape);
   if(self->transform) free(self->transform);
+  MetadataClose(self->meta);
   free(self);
 }
 
@@ -87,13 +76,15 @@ tile_t TileFromFile(const char* path, const char* format)
   ZERO(struct _tile_t,out,1);
   TRY(meta=MetadataOpen(path,format,"r"));
   TRY(out->aabb=AABBMake(0)); 
-  TRY(MetadataGetTileAABB(meta,out));
-  TRY(out->file=MetadataOpenVolume(meta,"r"));
-  TRY(out->shape=ndioShape(out->file));
-  n=ndndim(out->shape);
-  NEW(float,out->transform,(n+1)*(n+1));
-  TRY(MetadataGetTransform(meta,out->transform));
-  MetadataClose(meta);
+  TRY(MetadataGetTileAABB(meta,out));  
+  // -- Lazily load this stuff
+  //TRY(out->file=MetadataOpenVolume(meta,"r"));
+  //TRY(out->shape=ndioShape(out->file));
+  //n=ndndim(out->shape);
+  //NEW(float,out->transform,(n+1)*(n+1));
+  //TRY(MetadataGetTransform(meta,out->transform));
+  //  MetadataClose(meta);
+  out->meta=meta;
   LOG("TileBase: Loaded %s"ENDL,path);
   return out;
 Error:
@@ -104,7 +95,21 @@ Error:
 
 
 aabb_t TileAABB(tile_t self) { return self->aabb; }
-ndio_t TileFile(tile_t self) { return self->file; }
+ndio_t TileFile(tile_t self) 
+{ if(!self->file)
+    TRY(self->file=MetadataOpenVolume(self->meta,"r"));
+  return self->file; 
+Error:
+  return 0;
+}
+
+static nd_t TileShape(tile_t self)
+{ if(!self->shape)
+    TRY(self->shape=ndioShape(TileFile(self)));
+  return self->shape;
+Error:
+  return 0;
+}
 
 /**
  * Computes the voxel size from the tile database for dimension \a idim.
@@ -116,9 +121,11 @@ ndio_t TileFile(tile_t self) { return self->file; }
 float TileVoxelSize(tile_t self, unsigned idim)
 { int64_t *shape;
   float r;
+  nd_t v;
   TRY(self);
+  TRY(v=TileShape(self));
   TRY(AABBGet(self->aabb,NULL,NULL,&shape));
-  r=shape[idim]/(float)ndshape(self->shape)[idim];
+  r=shape[idim]/(float)ndshape(v)[idim];
   return r;
 Error:
   return 0.0;
@@ -135,7 +142,15 @@ Error:
  *                        
  */
 float* TileTransform(tile_t self)
-{ return self->transform;
+{ if(!self->transform)
+  { unsigned n;
+    TRY(n=ndndim(TileShape(self)));
+    NEW(float,self->transform,(n+1)*(n+1));
+    TRY(MetadataGetTransform(self->meta,self->transform));
+  }
+  return self->transform;
+Error:
+  return 0;
 }
 
 //
@@ -203,7 +218,11 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
   }
   closedir(dir);
   if(any)
-    TRY(push(tiles,TileFromFile(path,format)));
+  { tile_t t=0;
+    TRY(push(tiles,t=TileFromFile(path,format)));
+    if(t)
+      tiles->cache=TileBaseCacheWrite(tiles->cache,path,t);
+  }
   return 1;
 Error:
   if(dir) closedir(dir);
@@ -212,14 +231,25 @@ Error:
 
 /**
  * Open all the tiles contained in a directory tree rooted at \a path.
+ * \param[in] path   The root patht ot the directory tree containing all the tiles.
+ * \param[in] format The metadata format for the tiles.  May be the empty string or NULL,
+ *                   in which case the metadata format will be guessed.
  */
 tiles_t TileBaseOpen(const char* path, const char* format)
 { tiles_t out=0;
+  tilebase_cache_t cache=0;
   NEW( struct _tiles_t,out,1);
   ZERO(struct _tiles_t,out,1);
-  TRY(addtiles(out,path,format));
+  if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,out))
+  { TileBaseCacheClose(cache);
+  } else
+  { out->cache=TileBaseCacheOpen(path,"w");
+    TRY(addtiles(out,path,format));
+    TileBaseCacheClose(out->cache);
+  }
   return out;
 Error:
+  TileBaseCacheClose(out->cache);
   TileBaseClose(out);
   return 0;
 }

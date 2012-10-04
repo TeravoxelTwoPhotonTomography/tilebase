@@ -33,7 +33,7 @@
 struct _metadata_t
 { metadata_api_t *fmt; ///< The format specific implementation
   void           *ctx; ///< format specific file context
-	char           *log; ///< (UNUSED) Error log.  NULL if no error. 
+  char           *log; ///< (UNUSED) Error log.  NULL if no error. 
 };
 
 //
@@ -50,9 +50,9 @@ static size_t           g_countof_formats=0; ///< number of loaded metadata form
 static int maybe_load_plugins()
 { if(g_formats) return 1;
   TRY(g_formats=MetadataLoadPlugins(METADATA_PLUGIN_PATH,&g_countof_formats));
-	return 1;
+  return 1;
 Error:
-	return 0;
+  return 0;
 }
 
 /** \returns the index of the detected format on sucess, otherwise -1 */
@@ -98,7 +98,7 @@ char* MetadataError(metadata_t self)   {return self?self->log:0;}
 /** Detect the presence of readible metadata as \a path. */
 unsigned MetadataIsFound(const char *tilepath)
 { maybe_load_plugins();
-	return detect_file_type(tilepath,"r")>0;
+  return detect_file_type(tilepath,"r")>0;
 }
 
 /**
@@ -144,30 +144,30 @@ void MetadataClose(metadata_t self)
 unsigned MetadataGetShape(metadata_t self, size_t *nelem, int64_t *shape)
 { TRY(self&&self->fmt->shape);
   TRY(nelem);
-	return self->fmt->shape(self,nelem,shape);
+  return self->fmt->shape(self,nelem,shape);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataSetShape(metadata_t self, size_t  nelem, int64_t *shape)
 { TRY(self&&self->fmt->set_shape);
   TRY(shape);
-	return self->fmt->set_shape(self,nelem,shape);
+  return self->fmt->set_shape(self,nelem,shape);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataGetOrigin(metadata_t self, size_t *nelem, int64_t *ori)
 { TRY(self&&self->fmt->origin);
   TRY(nelem);
-	return self->fmt->origin(self,nelem,ori);
+  return self->fmt->origin(self,nelem,ori);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataSetOrigin(metadata_t self, size_t  nelem, int64_t *ori)
 { TRY(self&&self->fmt->set_origin);
   TRY(ori);
-	return self->fmt->set_origin(self,nelem,ori);
+  return self->fmt->set_origin(self,nelem,ori);
 Error:
-	return 0;
+  return 0;
 }
 ndio_t MetadataOpenVolume(metadata_t self, const char* mode)
 { ndio_t out;

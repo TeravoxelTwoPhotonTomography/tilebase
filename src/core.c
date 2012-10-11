@@ -22,6 +22,8 @@
 #include "metadata/metadata.h"
 #include <stdio.h>
 #include <string.h>
+#include "cache.h"
+#include "core.priv.h" // defines tile_t and tiles_t structs
 
 #ifdef _MSC_VER
 #include "util/dirent.win.h"
@@ -43,20 +45,6 @@
 static void breakme() {};
 /// @endcond
 
-struct _tile_t
-{ aabb_t aabb;  ///< bounding box for the tile
-  ndio_t file;  ///< opened file for reading
-  nd_t   shape;
-  float* transform;
-};
-
-struct _tiles_t
-{ tile_t *tiles;  ///< tiles array
-  size_t  sz,     ///< tiles array length
-          cap;    ///< tiles array capacity
-//  char   *log;    ///< error log (NULL if no errors)
-};
-
 //
 // === TILE API ===
 //
@@ -67,6 +55,7 @@ void TileFree(tile_t self)
   ndioClose(self->file);
   ndfree(self->shape);
   if(self->transform) free(self->transform);
+  MetadataClose(self->meta);
   free(self);
 }
 
@@ -79,31 +68,56 @@ void TileFree(tile_t self)
  * \param[in]   format  Metadata format used to read tile.  If NULL, the format
  *                      will be auto-detected.
  */
-tile_t TileFromFile(const char* path, const char* format)
+tile_t TileNew(const char* path, const char* metadata_format)
 { tile_t out=0;
   metadata_t meta=0;
   unsigned n;
   NEW(struct _tile_t,out,1);
   ZERO(struct _tile_t,out,1);
-  TRY(meta=MetadataOpen(path,format,"r"));
-  TRY(out->aabb=AABBMake(0)); 
-  TRY(MetadataGetTileAABB(meta,out));
-  TRY(out->file=MetadataOpenVolume(meta,"r"));
-  TRY(out->shape=ndioShape(out->file));
-  n=ndndim(out->shape);
-  NEW(float,out->transform,(n+1)*(n+1));
-  TRY(MetadataGetTransform(meta,out->transform));
-  MetadataClose(meta);
+  strncpy(out->path,path,sizeof(out->path));
+  TRY(out->path[sizeof(out->path)-1]=='\0');
+  if(metadata_format)
+  { strncpy(out->metadata_format,metadata_format,sizeof(out->metadata_format));
+    TRY(out->metadata_format[sizeof(out->metadata_format)-1]=='\0');
+  }
   return out;
 Error:
-  MetadataClose(meta);
   TileFree(out);
   return 0;
 }
 
-
-aabb_t TileAABB(tile_t self) { return self->aabb; }
-ndio_t TileFile(tile_t self) { return self->file; }
+static metadata_t TileMetadata(tile_t self)
+{ if(!self->meta)
+    TRY(self->meta=MetadataOpen(self->path,self->metadata_format,"r"));
+  return self->meta;
+Error:
+  return 0;
+}
+aabb_t TileAABB(tile_t self)
+{ if(!self->aabb)
+  { TRY(self->aabb=AABBMake(0));
+    TRY(MetadataGetTileAABB(TileMetadata(self),self));
+  }
+  return self->aabb;
+Error:
+  AABBFree(self->aabb);
+  self->aabb=0;
+  return 0;
+}
+ndio_t TileFile(tile_t self) 
+{ if(!self->file)
+    TRY(self->file=MetadataOpenVolume(TileMetadata(self),"r"));
+  return self->file; 
+Error:
+  return 0;
+}
+nd_t TileShape(tile_t self)
+{ if(!self->shape)
+    TRY(self->shape=ndioShape(TileFile(self)));
+  return self->shape;
+Error:
+  return 0;
+}
 
 /**
  * Computes the voxel size from the tile database for dimension \a idim.
@@ -115,9 +129,11 @@ ndio_t TileFile(tile_t self) { return self->file; }
 float TileVoxelSize(tile_t self, unsigned idim)
 { int64_t *shape;
   float r;
+  nd_t v;
   TRY(self);
+  TRY(v=TileShape(self));
   TRY(AABBGet(self->aabb,NULL,NULL,&shape));
-  r=shape[idim]/(float)ndshape(self->shape)[idim];
+  r=shape[idim]/(float)ndshape(v)[idim];
   return r;
 Error:
   return 0.0;
@@ -134,7 +150,15 @@ Error:
  *                        
  */
 float* TileTransform(tile_t self)
-{ return self->transform;
+{ if(!self->transform)
+  { unsigned n;
+    TRY(n=ndndim(TileShape(self)));
+    NEW(float,self->transform,(n+1)*(n+1));
+    TRY(MetadataGetTransform(self->meta,self->transform));
+  }
+  return self->transform;
+Error:
+  return 0;
 }
 
 //
@@ -181,9 +205,8 @@ Error:
 /**
  * Recursively descend path looking for tiles.
  *
- * If \a path contains entries that are not directories,
- * also try to open \a path as a tile.  If a tile is
- * successfully loaded, it's added to the internal tile list.
+ * Data is expected to be in the leaves.  A leaf is a subdirectory containing 
+ * no directories.
  */
 static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
 { int any=0;
@@ -195,14 +218,19 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
   while((ent=readdir(dir)))
   { if(ent->d_type==DT_DIR)
     { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
+      { any=1; // has a subdirectory ==> not a leaf
         if(!addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format)) // maybe add subdirs -- some subdirs might not be valid
-          continue; 
+          continue;
+      }
     }
-    else if(ent->d_type==DT_REG) any=1;
   }
   closedir(dir);
-  if(any)
-    TRY(push(tiles,TileFromFile(path,format)));
+  if(!any) // then it's a leaf
+  { tile_t t=0;
+    TRY(push(tiles,t=TileNew(path,format)));
+    if(t) // !!! insufficient?...Tile is lazy, so we don't know it's valid at constuction
+      TileBaseCacheWrite(tiles->cache,path,t); // this should be able to handle bad tiles by silently failing.
+  }
   return 1;
 Error:
   if(dir) closedir(dir);
@@ -211,14 +239,26 @@ Error:
 
 /**
  * Open all the tiles contained in a directory tree rooted at \a path.
+ * \param[in] path   The root patht ot the directory tree containing all the tiles.
+ * \param[in] format The metadata format for the tiles.  May be the empty string or NULL,
+ *                   in which case the metadata format will be guessed.
  */
 tiles_t TileBaseOpen(const char* path, const char* format)
 { tiles_t out=0;
-  NEW( struct _tiles_t,out,1);
-  ZERO(struct _tiles_t,out,1);
-  TRY(addtiles(out,path,format));
+  tilebase_cache_t cache=0;
+  if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out))
+  { TileBaseCacheClose(cache);
+  } else
+  { TileBaseClose(cache);
+    NEW( struct _tiles_t,out,1);
+    ZERO(struct _tiles_t,out,1);
+    out->cache=TileBaseCacheOpen(path,"w");
+    TRY(addtiles(out,path,format));
+    TileBaseCacheClose(out->cache);
+  }
   return out;
 Error:
+  TileBaseCacheClose(out->cache);
   TileBaseClose(out);
   return 0;
 }
@@ -259,7 +299,7 @@ aabb_t TileBaseAABB(tiles_t self)
 { aabb_t out=0;
   size_t i;
   for(i=0;i<self->sz;++i)
-    out=AABBUnionIP(out,self->tiles[i]->aabb);
+    out=AABBUnionIP(out,TileAABB(self->tiles[i]));
   return out;
 Error:
   return 0;

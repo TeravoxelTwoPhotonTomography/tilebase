@@ -17,6 +17,7 @@
 #include "plugin.h"
 #include "config.h"
 #include <stdio.h>
+#include <string.h>
 
 /// @cond DEFINES
 #define ENDL              "\n"
@@ -32,7 +33,7 @@
 struct _metadata_t
 { metadata_api_t *fmt; ///< The format specific implementation
   void           *ctx; ///< format specific file context
-	char           *log; ///< (UNUSED) Error log.  NULL if no error. 
+  char           *log; ///< (UNUSED) Error log.  NULL if no error. 
 };
 
 //
@@ -47,12 +48,11 @@ static size_t           g_countof_formats=0; ///< number of loaded metadata form
  * \todo make thread safe
  */
 static int maybe_load_plugins()
-{ size_t i;
-	if(g_formats) return 1;
+{ if(g_formats) return 1;
   TRY(g_formats=MetadataLoadPlugins(METADATA_PLUGIN_PATH,&g_countof_formats));
-	return 1;
+  return 1;
 Error:
-	return 0;
+  return 0;
 }
 
 /** \returns the index of the detected format on sucess, otherwise -1 */
@@ -83,7 +83,7 @@ static int get_format_by_name(const char *format)
 
 unsigned MetadataFormatCount()
 { maybe_load_plugins();
-  return g_countof_formats;
+  return (unsigned)g_countof_formats;
 }
 const char* MetadataFormatName(unsigned i)
 { if(i>=MetadataFormatCount()) return NULL;
@@ -98,7 +98,7 @@ char* MetadataError(metadata_t self)   {return self?self->log:0;}
 /** Detect the presence of readible metadata as \a path. */
 unsigned MetadataIsFound(const char *tilepath)
 { maybe_load_plugins();
-	return detect_file_type(tilepath,"r")>0;
+  return detect_file_type(tilepath,"r")>0;
 }
 
 /**
@@ -113,7 +113,7 @@ metadata_t MetadataOpen(const char *path, const char *format, const char *mode)
   { if(0>(ifmt=get_format_by_name(format))) goto ErrorSpecificFormat;
   } else
   { if(0>(ifmt=detect_file_type(path,mode))) goto ErrorDetectFormat;
-  }
+  }  
   TRY(ctx=g_formats[ifmt]->open(path,mode));
   NEW(struct _metadata_t,file,1);
   file->ctx=ctx;
@@ -144,34 +144,36 @@ void MetadataClose(metadata_t self)
 unsigned MetadataGetShape(metadata_t self, size_t *nelem, int64_t *shape)
 { TRY(self&&self->fmt->shape);
   TRY(nelem);
-	return self->fmt->shape(self,nelem,shape);
+  return self->fmt->shape(self,nelem,shape);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataSetShape(metadata_t self, size_t  nelem, int64_t *shape)
 { TRY(self&&self->fmt->set_shape);
   TRY(shape);
-	return self->fmt->set_shape(self,nelem,shape);
+  return self->fmt->set_shape(self,nelem,shape);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataGetOrigin(metadata_t self, size_t *nelem, int64_t *ori)
 { TRY(self&&self->fmt->origin);
   TRY(nelem);
-	return self->fmt->origin(self,nelem,ori);
+  return self->fmt->origin(self,nelem,ori);
 Error:
-	return 0;
+  return 0;
 }
 unsigned MetadataSetOrigin(metadata_t self, size_t  nelem, int64_t *ori)
 { TRY(self&&self->fmt->set_origin);
   TRY(ori);
-	return self->fmt->set_origin(self,nelem,ori);
+  return self->fmt->set_origin(self,nelem,ori);
 Error:
-	return 0;
+  return 0;
 }
 ndio_t MetadataOpenVolume(metadata_t self, const char* mode)
-{ TRY(self&&self->fmt->get_vol);
-  return self->fmt->get_vol(self,mode);
+{ ndio_t out;
+  TRY(self&&self->fmt->get_vol);
+  out=self->fmt->get_vol(self,mode);
+  return out;
 Error:
   return 0;
 }

@@ -6,8 +6,10 @@
 #include <string.h>
 #include "tilebase.h"
 #include "src/opts.h"
+#include "src/address.h"
 #include "src/render.h"
 #include "src/mkpath.h"
+
 #ifdef _MSC_VER
 #define snprintf _snprintf
 #endif
@@ -15,6 +17,7 @@
 #define countof(e) (sizeof(e)/sizeof(*e))
 
 #ifdef _MSC_VER
+#pragma warning (disable:4996) // deprecation warning for sprintf
 #define PATHSEP  '\\'
 #else
 #define PATHSEP  '/'
@@ -37,13 +40,15 @@
  * \param[in] address The address to render.
  */
 char* address_to_path(char* path, int n, address_t address)
-{ unsigned i,k;
-  //while((address=address_next(address)) && n>=0)
+{ unsigned k;
+  char *op=path;
   for(address=address_begin(address);address&&n>=0;address=address_next(address))
   { k=snprintf(path,n,"%u%c",address_id(address),PATHSEP);
     path+=k;
     n-=k;
   }
+  // remove terminal path separator
+  if(path!=op) path[-1]='\0';
   return (n>=0)?path:0;
 }
 
@@ -66,7 +71,7 @@ int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
   TRY(parse_args(argc,argv));
-  printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
+  //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
   TRY(render(tiles,OPTS.x_um,OPTS.y_um,OPTS.z_um,OPTS.countof_leaf,save));
 Finalize:

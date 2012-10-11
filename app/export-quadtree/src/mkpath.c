@@ -2,11 +2,11 @@
  * \file
  * Make path.
  */
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <stdio.h>  //for logging
 #include <string.h> //for strchr
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define ENDL     "\n"
 #define LOG(...) fprintf(stderr,__VA_ARGS__) 
@@ -33,7 +33,7 @@
  * Check that the path is an existing directory.
  */
 static int exists(char *path)
-{ struct _stat s={0};
+{ struct stat s={0};
   char buf[2048]={0};
   int i,n;
   // normalize path string for stat

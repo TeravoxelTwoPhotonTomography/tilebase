@@ -25,6 +25,7 @@ char*       MetadataError(metadata_t self);
 
 ndio_t      MetadataOpenVolume(metadata_t self, const char* mode);
 
+/// \todo Metadata interface should not use tile objects, use aabb instead
 unsigned    MetadataGetTileAABB(metadata_t self, tile_t tile);
 unsigned    MetadataSetTileAABB(metadata_t self, tile_t tile);
 

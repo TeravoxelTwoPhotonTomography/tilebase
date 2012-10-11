@@ -38,7 +38,7 @@ using namespace std;
 //#define DEBUG // if defined, turns on debug output
 
 #define ENDL               "\n"
-#define LOG(...)           fprintf(stderr,__VA_ARGS__)
+#define LOG(...)           do{ if(!g_silent) fprintf(stderr,__VA_ARGS__); } while(0)
 #define TRY(e)             do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 #define WARN(e)            do{if(!(e)) { LOG("%s(%d): %s() WARNING"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); }} while(0)
 #define FAIL(msg)          do{ LOG("%s(%d): %s()"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,msg); goto Error;} while(0)
@@ -60,6 +60,14 @@ using namespace std;
 typedef fetch::cfg::device::Microscope scope_desc_t;
 typedef fetch::cfg::data::Acquisition  stack_desc_t;
 typedef google::protobuf::Message      desc_t;
+
+//
+// GLOBALS
+//
+/// \todo protect globals with a mutex
+static int g_silent=0; ///< Use to turn logging to stderr on/off.
+
+static void toggle_silence() { g_silent=!g_silent; }
 
 //
 // CONTEXT
@@ -139,7 +147,6 @@ int readDesc(const char* filename, desc_t *desc)
   raw=new google::protobuf::io::FileInputStream(fd);
   parser.RecordErrorsTo(&e);
   TRY(parser.Parse(raw,desc));
-  TRY(e.ok());
 Finalize:
   if(fd>=0) close(fd);    
   if(raw) delete raw;
@@ -258,9 +265,13 @@ const char* pbufv0_name()
 unsigned pbufv0_is_fmt(const char* path, const char* mode)
 { char name[1024];
   scope_desc_t desc;
-  return (find(name,sizeof(name),path,".acquisition") && 
+  unsigned v;
+  toggle_silence();
+  v=(find(name,sizeof(name),path,".acquisition") && 
           find(name,sizeof(name),path,".microscope") &&
           readDesc(name,&desc));
+  toggle_silence();
+  return v;
 }
 
 /** Valid modes: "r", "w", "rw" */

@@ -110,13 +110,15 @@ Error:
  * Does not copy.
  */
 aabb_t AABBGet(aabb_t self, size_t* ndim, int64_t** ori, int64_t** shape)
-{
+{ TRY(self);
 #define SET(e,v) if(e) *(e)=(v)
   SET(ndim,self->ndim);
   SET(ori,self->ori);
   SET(shape,self->shape);
 #undef SET
   return self;
+Error:
+  return 0;
 }
 
 size_t AABBNDim(aabb_t self)
@@ -230,4 +232,15 @@ aabb_t AABBUnionIP(aabb_t dst, aabb_t src)
   return dst;
 Error:
   return 0;
+}
+
+/**
+ * Returns the volume of the bounding box in physical units (nanometers).
+ */
+int64_t AABBVolume(aabb_t self)
+{ int64_t v=1;
+  unsigned i;
+  for(i=0;i<self->ndim;++i)
+    v*=self->shape[i];
+  return v;
 }

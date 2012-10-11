@@ -83,9 +83,9 @@ nd_t make_aa_filter(float scale,nd_t workspace)
   r=gaussian_filter_radius(scale,0.01);
   n=2*r+1;
   if(!out)
-    TRY(ndcast(ndref(out=ndinit(),malloc(n*sizeof(float)),n),nd_f32));
+    TRY(ndcast(ndref(out=ndinit(),malloc(n*sizeof(float)),nd_heap),nd_f32));
   if(ndnelem(out)<n)
-    TRY(ndref(out,realloc(nddata(out),n*sizeof(float)),n));
+    TRY(ndref(out,realloc(nddata(out),n*sizeof(float)),nd_heap));
   linspace(out,-(float)r,r);
   normpdf(out,0.0f,scale/2.0);
 #if 0

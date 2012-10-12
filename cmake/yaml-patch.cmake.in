@@ -1,0 +1,30 @@
+# Patch to modify boosts' bootstrap.sh
+# Requires:
+# _SOURCE_DIR - path to the CMakeLists.txt file to patch
+
+macro(show v)
+  message("${v} is ${${v}}")
+endmacro()
+
+set(_SOURCE_DIR @_SOURCE_DIR@)
+set(_PLAT       @_PLAT@)
+
+set(_TARGET "${_SOURCE_DIR}/libyaml.sln")
+if(NOT EXISTS ${_TARGET})
+  message( FATAL_ERROR "Cannot find ${_TARGET}" )
+endif()
+file(READ "${_TARGET}" _DATA)
+string(REGEX REPLACE Win32 ${_PLAT} _DATA "${_DATA}")
+file( WRITE "${_TARGET}" "${_DATA}" )
+
+file(GLOB PROJECTS "${_SOURCE_DIR}/*.vcproj")
+foreach(p ${PROJECTS})
+  set(_TARGET "${p}")
+  show(_TARGET)
+  if(NOT EXISTS ${_TARGET})
+    message( FATAL_ERROR "Cannot find ${_TARGET}" )
+  endif()
+  file(READ "${_TARGET}" _DATA)
+  string(REGEX REPLACE Win32 ${_PLAT} _DATA "${_DATA}")
+  file( WRITE "${_TARGET}" "${_DATA}" )
+endforeach()

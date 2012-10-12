@@ -55,7 +55,7 @@ if(NOT TARGET boost)
 endif()
 
 get_target_property(BOOST_ROOT_DIR boost _EP_INSTALL_DIR)
-show(BOOST_ROOT_DIR)
+#show(BOOST_ROOT_DIR)
 #set(BOOST_LIBRARIES PARENT_SCOPE)
 foreach(_lib chrono context date_time exception filesystem graph iostreams locale
              math_c99 math_c99f math_c99l math_tr1 math_tr1f math_tr1l

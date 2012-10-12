@@ -249,8 +249,7 @@ tiles_t TileBaseOpen(const char* path, const char* format)
   if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out))
   { TileBaseCacheClose(cache);
   } else
-  { TileBaseClose(cache);
-    NEW( struct _tiles_t,out,1);
+  { NEW( struct _tiles_t,out,1);
     ZERO(struct _tiles_t,out,1);
     out->cache=TileBaseCacheOpen(path,"w");
     TRY(addtiles(out,path,format));
@@ -258,7 +257,6 @@ tiles_t TileBaseOpen(const char* path, const char* format)
   }
   return out;
 Error:
-  TileBaseCacheClose(out->cache);
   TileBaseClose(out);
   return 0;
 }

@@ -28,7 +28,7 @@ int    AABBHit(aabb_t a, aabb_t b);
 aabb_t AABBBinarySubdivision(aabb_t *out, unsigned n, aabb_t a); // n=4 quad, n==8 oct etc...
 aabb_t AABBUnionIP(aabb_t dst, aabb_t src);
 
-int64_t AABBVolume(aabb_t self);
+double AABBVolume(aabb_t self);
 
 
 #ifdef __cplusplus

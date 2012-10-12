@@ -237,10 +237,10 @@ Error:
 /**
  * Returns the volume of the bounding box in physical units (nanometers).
  */
-int64_t AABBVolume(aabb_t self)
-{ int64_t v=1;
+double AABBVolume(aabb_t self)
+{ double v=1;
   unsigned i;
   for(i=0;i<self->ndim;++i)
-    v*=self->shape[i];
+    v*=(double)self->shape[i];
   return v;
 }

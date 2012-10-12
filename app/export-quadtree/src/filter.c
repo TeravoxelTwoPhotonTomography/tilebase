@@ -78,16 +78,16 @@ nd_t make_aa_filter(float scale,nd_t workspace)
 { nd_t out=workspace;  
   size_t r,n; //filter radius, size
   TRY(isfinite(scale));
-  scale=fabs(scale);
+  scale=fabs(scale)/2.0; // this is the sigma that gets used...the divisor is pretty arbitrary
   //if(scale<=1.0f) return 0; // no filter needed
   r=gaussian_filter_radius(scale,0.01);
   n=2*r+1;
   if(!out)
-    TRY(ndcast(ndref(out=ndinit(),malloc(n*sizeof(float)),nd_heap),nd_f32));
+    TRY(ndreshapev(ndcast(ndref(out=ndinit(),malloc(n*sizeof(float)),nd_heap),nd_f32),1,n));
   if(ndnelem(out)<n)
-    TRY(ndref(out,realloc(nddata(out),n*sizeof(float)),nd_heap));
+    TRY(ndreshapev(ndref(out,realloc(nddata(out),n*sizeof(float)),nd_heap),1,n));
   linspace(out,-(float)r,r);
-  normpdf(out,0.0f,scale/2.0);
+  normpdf(out,0.0f,scale);
 #if 0
   ndioClose(ndioWrite(ndioOpen("filter.h5",0,"w"),out));
 #endif

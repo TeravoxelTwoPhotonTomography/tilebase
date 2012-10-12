@@ -6,6 +6,7 @@
 #include "cache.h"
 #include "metadata/metadata.h"
 #include "core.priv.h"
+#define YAML_DECLARE_STATIC // on windows this should be defined if we're using static linking of libyaml (which we are)
 #include "yaml.h"
 #include <string.h>
 #include <errno.h>
@@ -16,6 +17,8 @@
 #ifdef _MSC_VER
  #define vscprintf(fmt,args) _vscprintf(fmt,args)
  #define PATHSEP "\\"
+ #define va_copy(a,b) ((a)=(b))
+ #define snprintf _snprintf
 #else
  #define vscprintf(fmt,args) vsnprintf(NULL,0,fmt,args)
  #define PATHSEP "/"
@@ -431,17 +434,22 @@ void TileBaseCacheClose(tilebase_cache_t self)
 { if(!self) return;
   if(self->log)
     printf("[TileBaseCache]\n\t%s\n",self->log);
+  //else if(self->mode==WRITE)// write the footer if everything is ok
+
   switch(self->mode)
   { case READ:
       yaml_parser_delete(PARSER);
       release(self);
       if(TILES) TileBaseClose(TILES);
+      break;
     case WRITE:
-      SEQ_END; EMIT;
-      MAP_END; EMIT;
-      yaml_document_end_event_initialize(EVENT,0);
-      EMIT;
+      { SEQ_END; EMIT;
+        MAP_END; EMIT;
+        yaml_document_end_event_initialize(EVENT,0);
+        EMIT;
+      }
       yaml_emitter_delete(EMITTER);
+      break;
     default:;
   }
   yaml_event_delete(EVENT);

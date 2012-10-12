@@ -36,6 +36,11 @@
 static void breakme() {LOG(ENDL);}
 
 
+void dump(const char *filename,nd_t a)
+{ LOG("Writing %s"ENDL,filename);
+  ndioClose(ndioWrite(ndioOpen(filename,"series","w"),a));
+}
+
 // === RENDERING ===
 
 typedef struct _filter_workspace
@@ -119,7 +124,7 @@ Error:
 }
 
 static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
-{ int64_t c=AABBVolume(bbox)/(int64_t)desc->voxvol_nm3;
+{ int64_t c=AABBVolume(bbox)/(double)desc->voxvol_nm3;
   return c<(int64_t)desc->countof_leaf;
 }
 
@@ -196,13 +201,15 @@ Error:
  * \todo FIXME: assumes working with at-least-3d data.
  */
 nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
-{ unsigned i,ndim=ndndim(vol);
+{ unsigned i=0,ndim=ndndim(vol);
   for(i=0;i<3;++i) 
     TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i])); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TRY(filter_workspace__gpu_resize(ws,vol));  
   TRY(ndcopy(ws->gpu[0],vol,0,0));
+#if 1
   for(i=0;i<3;++i)
     TRY(ndconv1(ws->gpu[~i&1],ws->gpu[i&1],ws->filters[i],i,&ws->params));
+#endif
   ws->i=i&1; // this will be the index of the last destination buffer
   return ws->gpu[ws->i];
 Error:
@@ -215,9 +222,12 @@ nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
 { TRY(affine_workspace__gpu_resize(ws,dst));
   TRY(ndref(ws->host_xform,transform,nd_heap));
   TRY(ndcopy(ws->gpu_xform,ws->host_xform,0,0));
+  //dump("xform-src.%.tif",src);
   TRY(ndaffine(dst,src,nddata(ws->gpu_xform),&ws->params));
+  //dump("xform-dst.%.tif",dst);
   return dst;
 Error:
+  if(dst) LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(dst));
   return 0;
 }
 
@@ -266,7 +276,7 @@ static nd_t make(desc_t *desc, aabb_t bbox, address_t path);
 static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
 { 
   nd_t cs[4];
-  unsigned i,any=0;
+  unsigned i,iok,any=0;
   nd_t out,t;
   aabb_t cboxes[4]={0};
   size_t ndim;
@@ -276,24 +286,26 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
     cs[i]=make(desc,cboxes[i],path);
     TRY(address_pop(path));
     any|=(cs[i]!=0);
+    if(cs[i]!=0) iok=i;
   }
   if(!any) return 0;
 
   { int64_t *cshape_nm;
     AABBGet(cboxes[0],0,0,&cshape_nm);
     TRY(out=alloc_vol(desc,bbox,
-      2.0f*cshape_nm[0]/ndshape(cs[0])[0],
-      2.0f*cshape_nm[1]/ndshape(cs[0])[1],
-      cshape_nm[2]/ndshape(cs[0])[2]));
+      2.0f*cshape_nm[0]/ndshape(cs[iok])[0],
+      2.0f*cshape_nm[1]/ndshape(cs[iok])[1],
+      cshape_nm[2]/ndshape(cs[iok])[2]));
   }
   ndim=ndndim(out);
   for(i=0;i<4;++i)
-  { 
-    box2box(desc->transform,out,bbox,cs[i],cboxes[i]);
-    AABBFree(cboxes[i]);
-    TRY(t=aafilt(cs[i],desc->transform,&desc->fws));
-    release_vol(desc,cs[i]);
-    TRY(xform(out,t,desc->transform,&desc->aws));
+  { if(cs[i])
+    { box2box(desc->transform,out,bbox,cs[i],cboxes[i]);
+      AABBFree(cboxes[i]);
+      TRY(t=aafilt(cs[i],desc->transform,&desc->fws));
+      release_vol(desc,cs[i]);
+      TRY(xform(out,t,desc->transform,&desc->aws));
+    }
   }
   return out;
 Error:

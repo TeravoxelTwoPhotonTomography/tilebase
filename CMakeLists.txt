@@ -50,7 +50,7 @@ file(GLOB HDRS src/*.h src/metadata/*.h src/util/*.h)
 ### LIBRARY ###
 
 add_definitions(-fPIC)
-add_library(tilebase
+add_library(tilebase STATIC
   ${SRCS} ${HDRS}
   config.h.in
   ${PROJECT_BINARY_DIR}/config.h
@@ -61,7 +61,6 @@ target_link_libraries(tilebase
   ${SHLWAPI}
   ${YAML_LIBRARIES}
 )
-
 # tile metadata plugins
 file(GLOB PLUGINS plugins/*)
 foreach(PLUGIN ${PLUGINS})

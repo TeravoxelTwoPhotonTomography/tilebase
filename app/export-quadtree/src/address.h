@@ -6,6 +6,7 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
+#include <stdint.h>
 
 typedef struct _address_t* address_t;
 
@@ -22,7 +23,8 @@ address_t address_next(address_t self);
 address_t address_push(address_t self, int i);
 address_t address_pop(address_t self);
 
-
+// debugging/output
+uint64_t address_to_int(address_t self, uint64_t base);
 
 #ifdef __cplusplus
 } //extern "C"

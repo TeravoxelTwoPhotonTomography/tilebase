@@ -71,3 +71,12 @@ address_t address_pop(address_t self)
   self->sz--;
   return self;
 }
+
+/** Render address to an unsigned integer (for printing).*/
+uint64_t address_to_int(address_t self, uint64_t base)
+{ uint64_t v=0;
+  size_t i;
+  for(i=0;i<self->sz;++i)
+    v=v*base+(1+self->ids[i]); // 1,2,3,4
+  return v;
+}

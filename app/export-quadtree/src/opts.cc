@@ -21,8 +21,10 @@
 
 #ifdef _MSC_VER
  #define PATHSEP '\\'
+ #define MU      "u"
 #else
  #define PATHSEP '/'
+ #define MU      "µ"
 #endif
 
 using namespace std;
@@ -143,7 +145,7 @@ const char* tilebase_format_help_string()
   "Available formats:"
   );
   for(unsigned i=0;i<MetadataFormatCount();++i)
-    help+=string("\n-   ")+string(MetadataFormatName(i));
+    help+=string("\n  ")+string(MetadataFormatName(i));
   if(!MetadataFormatCount())
     help+="   (None Found!)";
   return help.c_str();
@@ -181,27 +183,29 @@ unsigned parse_args(int argc, char *argv[])
     file_opts.add_options() 
       ("source-path,i",
           value<ExistingPath>(&g_input_path)->required(),
-          "Data is read from this directory.  Must exist.")
+          "Data is read from this directory.")
       ("dest-path,o",
           value<string>(&g_output_path)->required(),
-          "Results are placed in this root directory.  Will be created if it doesn't exist.")
-      ("dest-file,p",
+          "Results are placed in this root directory.  It will be created if it doesn't exist.")
+      ("dest-file,f",
           value<string>(&g_dst_pattern)->default_value("default.%.tif"),
           "The file name pattern used to save downsampled volumes.  "
           "Different color channels are saved to different volumes.  "
-          "Put a % sign where you want the color channel id to go.  "
+          "For file sereies, put a % sign where you want the color channel id to go.  "
           "Examples:\n"
-          "  default.%.tif\n"
-          "  default.%.mp4"
+          "  default.h5    - \tsave to HDF5.\n"          
+          "  default.%.tif - \tsave to tiff series.\n"
+          "  default.%.mp4 - \tsave to mp4 series. One color per file.\n"
+          "  default.mp4   - \tsave to mp4.  Will try mono,RGB,RGBA."
       )
-      ("source-format,f",
+      ("source-format,F",
           value<TileBaseFormat>(&g_src_fmt),
           tilebase_format_help_string())
       ;
     param_opts.add_options()
-      ("x_um,x",value<float>(&OPTS.x_um)->default_value(0.5),"Finest pixel size (x µm) to render.")
-      ("y_um,y",value<float>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y µm) to render.")
-      ("z_um,z",value<float>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z µm) to render.")
+      ("x_um,x",value<float>(&OPTS.x_um)->default_value(0.5),"Finest pixel size (x "MU"m) to render.")
+      ("y_um,y",value<float>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y "MU"m) to render.")
+      ("z_um,z",value<float>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z "MU"m) to render.")
       ("count-of-leaf,n",
            value<HumanReadibleSize>(&g_countof_leaf)->default_value(HumanReadibleSize("64M")),
            "Maximum size of leaf volume in pixels.  "

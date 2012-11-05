@@ -119,6 +119,11 @@ static void cleanup_desc(desc_t *desc)
   if(desc->transform) free(desc->transform);
 }
 
+static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
+{ int64_t c=AABBVolume(bbox)/(double)desc->voxvol_nm3;
+  return c<(int64_t)desc->countof_leaf;
+}
+
 /// Count path length from the current node to a leaf
 static int pathlength(desc_t *desc, aabb_t bbox)
 { int i,n=0;
@@ -159,11 +164,6 @@ static desc_t* set_ref_shape(desc_t *desc, nd_t v)
 Error:
   LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(t));
   return 0;
-}
-
-static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
-{ int64_t c=AABBVolume(bbox)/(double)desc->voxvol_nm3;
-  return c<(int64_t)desc->countof_leaf;
 }
 
 static int sum(int n, const int*const v)

@@ -81,10 +81,10 @@ int main(int argc, char* argv[])
   TRY(parse_args(argc,argv));
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
-  TRY(render(tiles,OPTS.x_um,OPTS.y_um,OPTS.z_um,OPTS.countof_leaf,save));
+  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save));
 Finalize:
   TileBaseClose(tiles); 
-  LOG("Press <ENTER>"ENDL); getchar();
+  //LOG("Press <ENTER>"ENDL); getchar();
   return ecode;
 Error:
   ecode=1;

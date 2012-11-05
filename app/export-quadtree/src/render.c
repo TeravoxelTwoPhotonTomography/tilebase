@@ -93,15 +93,15 @@ static void affine_workspace__init(affine_workspace *ws)
   ws->params.boundary_value=0x8000;
 };
 
-static desc_t make_desc(tiles_t tiles, float x_um, float y_um, float z_um, size_t countof_leaf, handler_t yield)
+static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, handler_t yield)
 { const float um2nm=1e3;
 
   desc_t out;
   memset(&out,0,sizeof(out));
   out.tiles=tiles;
-  out.x_nm=x_um*um2nm;
-  out.y_nm=y_um*um2nm;
-  out.z_nm=z_um*um2nm;
+  out.x_nm=voxel_um[0]*um2nm;
+  out.y_nm=voxel_um[1]*um2nm;
+  out.z_nm=voxel_um[2]*um2nm;
   out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
   out.countof_leaf=countof_leaf;
   out.yield=yield;
@@ -413,17 +413,14 @@ Error:
 
 /** Select a subvolume from the total data set using fractional coordinates.  
   */
-aabb_t sub(tiles_t tiles, float ox, float oy, float oz, float w, float h, float d)
+aabb_t sub(tiles_t tiles, float o[3], float s[3])
 { aabb_t bbox;
   int64_t *ori,*shape;
+  int i;
   TRY(bbox=TileBaseAABB(tiles));
   AABBGet(bbox,0,&ori,&shape);
-  ori[0]=ori[0]+ox*shape[0];
-  ori[1]=ori[1]+oy*shape[1];
-  ori[2]=ori[2]+oz*shape[2];
-  shape[0]=w*shape[0];
-  shape[1]=h*shape[1];
-  shape[2]=d*shape[2];
+  for(i=0;i<3;++i) ori[i]  =ori[i]+o[i]*shape[i];
+  for(i=0;i<3;++i) shape[i]=       s[i]*shape[i];
   return bbox;
 Error:
   return 0;
@@ -431,20 +428,19 @@ Error:
 
 /**
  * \param[in]   tiles        Source tile database.
- * \param[in]   x_um         Desired pixel size of leaf nodes.
- * \param[in]   y_um         Desired pixel size of leaf nodes.
- * \param[in]   z_um         Desired pixel size of leaf nodes.
+ * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
+ * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
+ * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
  * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
- * \param[in]   onyield      Callback that handles nodes in the tree when they
+ * \param[in]   yield        Callback that handles nodes in the tree when they
  *                           are done being rendered.
  */
-unsigned render(tiles_t tiles, float x_um, float y_um, float z_um, size_t countof_leaf, handler_t yield)
+unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,x_um,y_um,z_um,countof_leaf,yield);
+  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=TileBaseAABB(tiles));
-  //TRY(bbox=sub(tiles,0.0f,0.0f,0.0f,1.0f,1.0f,1.0f));
+  TRY(bbox=sub(tiles,ori,size));
   TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   make(&desc,bbox,path);

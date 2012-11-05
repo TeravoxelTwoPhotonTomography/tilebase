@@ -18,6 +18,9 @@ typedef struct _opts_t
   float y_um;
   float z_um;
 
+  float ox,oy,oz;
+  float lx,ly,lz;
+
   unsigned countof_leaf;
 } opts_t;
 

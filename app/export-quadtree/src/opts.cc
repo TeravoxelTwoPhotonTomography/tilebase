@@ -90,6 +90,15 @@ struct HumanReadibleSize
 ostream &operator<<(ostream &stream, HumanReadibleSize  s) {return stream<<s.print();}
 istream &operator>>(istream &stream, HumanReadibleSize &s) {return s.parse(stream); }
 
+struct ZeroToOne
+{ float v_;
+  ZeroToOne(): v_(0.0) {}
+  ZeroToOne(float v): v_(v) {}
+  ZeroToOne(string v) { istringstream ss(v); parse(ss); }
+  istream& parse(istream& in) { return in>>v_; }    
+};
+ostream &operator<<(ostream &stream, ZeroToOne  s) {return stream<<s.v_;}
+istream &operator>>(istream &stream, ZeroToOne &s) {return s.parse(stream); }
 
 struct dir
 { DIR *d_;
@@ -123,8 +132,7 @@ static void validate(any& v,const vector<string>& vals,TileBaseFormat*,int)
 }
 
 static void validate(any &v,const vector<string>& vals,HumanReadibleSize*,int)
-{ //validators::check_first_occurrence(v);
-  const string& o=validators::get_single_string(vals);
+{ const string& o=validators::get_single_string(vals);
   istringstream ss(o);
   int i=-1;
   string s,suffixes(" kMGPTE");
@@ -132,6 +140,18 @@ static void validate(any &v,const vector<string>& vals,HumanReadibleSize*,int)
   if(i<=0||suffixes.find(s[0])==suffixes.length())
     throw validation_error(validation_error::invalid_option_value);
   v=any(HumanReadibleSize(o));
+  return;
+}
+
+static void validate(any &v,const vector<string>& vals,ZeroToOne*,int)
+{ const string& o=validators::get_single_string(vals);
+  const float tol=1e-3;
+  istringstream ss(o);
+  float a;
+  ss>>a;
+  if(a<=-tol || (1.0+tol)<=a)
+    throw validation_error(validation_error::invalid_option_value);
+  v=any(ZeroToOne(o));
   return;
 }
 
@@ -174,6 +194,7 @@ unsigned parse_args(int argc, char *argv[])
   options_description cmdline_options("General options"),
                       file_opts      ("File options"),
                       param_opts     ("Parameters");
+  ZeroToOne ox,oy,oz,lx,ly,lz;
   OPTS.src=OPTS.dst=0;
   try
   {
@@ -206,6 +227,12 @@ unsigned parse_args(int argc, char *argv[])
       ("x_um,x",value<float>(&OPTS.x_um)->default_value(0.5),"Finest pixel size (x "MU"m) to render.")
       ("y_um,y",value<float>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y "MU"m) to render.")
       ("z_um,z",value<float>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z "MU"m) to render.")
+      ("ox"    ,value<ZeroToOne>(&ox)->default_value(ZeroToOne(0.0)),"")
+      ("oy"    ,value<ZeroToOne>(&oy)->default_value(ZeroToOne(0.0)),"")
+      ("oz"    ,value<ZeroToOne>(&oz)->default_value(ZeroToOne(0.0)),"Output box origin as a fraction of the total bounding box (0 to 1).")
+      ("lx"    ,value<ZeroToOne>(&lx)->default_value(ZeroToOne(1.0)),"")
+      ("ly"    ,value<ZeroToOne>(&ly)->default_value(ZeroToOne(1.0)),"")
+      ("lz"    ,value<ZeroToOne>(&lz)->default_value(ZeroToOne(1.0)),"Output box depth as a fraction of the total bounding box (0 to 1).")
       ("count-of-leaf,n",
            value<HumanReadibleSize>(&g_countof_leaf)->default_value(HumanReadibleSize("64M")),
            "Maximum size of leaf volume in pixels.  "
@@ -244,6 +271,12 @@ unsigned parse_args(int argc, char *argv[])
     cerr<<"Unknown error!"<<endl<<usage<<endl<<cmdline_options<<endl;
     return 0;
   }
+  OPTS.ox=ox.v_;
+  OPTS.oy=oy.v_;
+  OPTS.oz=oz.v_;
+  OPTS.lx=lx.v_;
+  OPTS.ly=ly.v_;
+  OPTS.lz=lz.v_;
   OPTS.src=g_input_path.path_.c_str();
   OPTS.dst=g_output_path.c_str();
   OPTS.dst_pattern=g_dst_pattern.c_str();

@@ -238,8 +238,9 @@ static int recursive_load(apis_t *apis,DIR* dir,const char *path)
       const char *p[]={path,"/",ent->d_name};
       if( (ent->d_name[0]=='.')// respect hidden files/paths
 #ifdef __APPLE__
-        ||(has_extension(ent->d_name,ent->d_namlen,"dSYM",sizeof("dSYM"))))
+        ||(has_extension(ent->d_name,ent->d_namlen,"dSYM",sizeof("dSYM")))
 #endif
+        )
         continue;
       TRY(buf=(char*)alloca(n),"Out of stack space.");
       cat(buf,n,3,p);

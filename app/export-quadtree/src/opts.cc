@@ -105,9 +105,9 @@ istream &operator>>(istream &stream, ZeroToOne &s) {return s.parse(stream); }
 struct Address
 { address_t v_;
   Address():v_(0){}
-  Address(const Address& copy):v_(0) {v_=copy_address(copy.v_);}
+  //Address(const Address& copy):v_(0) {v_=copy_address(copy.v_);} /// \todo FIXME - an address leaks...it's a small leak
   Address(string v):v_(0) { istringstream ss(v); parse(ss); }
-  ~Address() {free_address(v_);v_=0;}
+  //~Address() {free_address(v_);v_=0;}
   istream& parse(istream& in)
   { string s;
     char *end;
@@ -179,12 +179,12 @@ static void validate(any &v,const vector<string>& vals,ZeroToOne*,int)
   return;
 }
 
-static void validate(any &v,const vector<string>& vals,Address*,int)
+static void validate(any &v,const vector<string>& vals,Address* _a,int _i)
 { const string& o=validators::get_single_string(vals);
   Address a(o);
   if(!a.ok())
     throw validation_error(validation_error::invalid_option_value);
-  v=any(Address(o));
+  v=any(a);
   return;
 }
 //
@@ -229,12 +229,14 @@ unsigned parse_args(int argc, char *argv[])
                       param_opts     ("Parameters");
   ZeroToOne ox,oy,oz,lx,ly,lz;
   OPTS.src=OPTS.dst=0;
+  OPTS.gpu_id=0;
   try
   {
     cmdline_options.add_options()
       ("help","Print this help message.")
       ("print-addresses","Print the addresses of each node in the tree in order of dependency.")
       ("target-address",value<Address>(&g_target_address),"Render target address in the tree from it's children.")
+      ("gpu",value<int>(&OPTS.gpu_id)->default_value(0),"Use this GPU for acceleration.");
       ;
     file_opts.add_options() 
       ("source-path,i",

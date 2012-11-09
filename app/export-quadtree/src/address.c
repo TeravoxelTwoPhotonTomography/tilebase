@@ -16,6 +16,7 @@
 
 #ifdef _MSC_VER
 #pragma warning (disable:4996) // deprecation warning for sprintf
+#define snprintf _snprintf
 #define PATHSEP  '\\'
 #else
 #define PATHSEP  '/'
@@ -115,7 +116,7 @@ address_t address_from_int(uint64_t v, size_t ndigits, uint64_t base)
   address_t out=0;
   TRY(out=make_address());
   for(i=0;i<ndigits;++i)
-  { TRY(address_push(out,v%base));
+  { if(v) TRY(address_push(out,(v-1)%base)); // 0 is root.  digits 1-4 address nodes on the path.
     v/=base;
   }
   return out;
@@ -134,7 +135,7 @@ char* address_to_path(char* path, int n, address_t address)
 { unsigned k;
   char *op=path;
   for(address=address_begin(address);address&&n>=0;address=address_next(address))
-  { k=snprintf(path,n,"%u%c",address_id(address),PATHSEP);
+  { k=snprintf(path,n,"%u%c",address_id(address)+1,PATHSEP);
     path+=k;
     n-=k;
   }

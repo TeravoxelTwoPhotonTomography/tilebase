@@ -93,18 +93,27 @@ int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
   TRY(parse_args(argc,argv));
+  cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
+
   if(OPTS.flag_print_addresses)
-    TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,print_addr,stdout));
+  { TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,print_addr,stdout));
+    goto Finalize;
+  }
+
   if(OPTS.target)
-    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL,load,address_from_int(0,1,10)));
-  else
-    TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL));
+  { printf("RENDERING TARGET: ");
+    print_addr(0,OPTS.target,stdout);
+    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL,load,OPTS.target));
+    goto Finalize;
+  }
+  
+  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL));
   
 Finalize:
   TileBaseClose(tiles); 
-  //LOG("Press <ENTER>"ENDL); getchar();
+  LOG("Press <ENTER>"ENDL); getchar();
   return ecode;
 Error:
   ecode=1;

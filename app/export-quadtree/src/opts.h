@@ -10,10 +10,7 @@
 #endif
 
 typedef struct _opts_t
-{ unsigned  flag_print_addresses;
-  address_t target; // if not NULL, will try to render target from it's children.
-
-  const char *src;
+{ const char *src;
   const char *dst;
   const char *src_format;
   const char *dst_pattern;
@@ -26,6 +23,10 @@ typedef struct _opts_t
   float lx,ly,lz;
 
   unsigned countof_leaf;
+
+  unsigned  flag_print_addresses;
+  address_t target; // if not NULL, will try to render target from it's children.
+  int gpu_id;
 } opts_t;
 
 extern opts_t OPTS; // Global variable for holding config loaded from parse_args

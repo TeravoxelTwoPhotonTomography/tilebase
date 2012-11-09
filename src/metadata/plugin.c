@@ -67,19 +67,25 @@ const char* estring();
 
 /// @endcond
 
-/** Detects loadable libraries based on filename */
-static int is_shared_lib(const char *fname,size_t n)
-{ const char *dot;
+static int has_extension(const char* fname,size_t sizeof_fname, const char* ext, size_t sizeof_ext)
+{const char *dot;
   int len;
   SILENTTRY(dot=strrchr(fname,'.'),"No extension found in file name.");
-  len = n-(dot-fname+1);
-  DBG("[PLUGIN] Searching for [%10s] Got extension [%15s]. Length %2d. File: %s"ENDL,
-      EXTENSION,dot+1,len,fname);
-  return len==(sizeof(EXTENSION)-1) //"sizeof" includes the terminating NULL
-      && (0==strncmp(dot+1,EXTENSION,len));
+  len = (int)(sizeof_fname-(dot-fname+1));
+#if 0
+  DBG("Searching for [%10s] Got extension [%15s]. Length %2d. File: %s"ENDL,
+      ext,dot+1,len,fname);
+#endif  
+  return len==(sizeof_ext-1) //"sizeof" includes the terminating NULL
+      && (0==strncmp(dot+1,ext,len));
 Error:
   //LOG("\tFile: %s"ENDL,fname);
   return 0;
+}
+
+/** Detects loadable libraries based on filename */
+static int is_shared_lib(const char *fname,size_t n)
+{ return has_extension(fname,n,EXTENSION,sizeof(EXTENSION));
 }
 
 /** 
@@ -230,7 +236,10 @@ static int recursive_load(apis_t *apis,DIR* dir,const char *path)
     { char *buf;
       size_t n=strlen(path)+strlen(ent->d_name)+2;
       const char *p[]={path,"/",ent->d_name};
-      if(ent->d_name[0]=='.')// respect hidden files/paths //0==strcmp(ent->d_name,".")*strcmp(ent->d_name,".."))
+      if( (ent->d_name[0]=='.')// respect hidden files/paths
+#ifdef __APPLE__
+        ||(has_extension(ent->d_name,ent->d_namlen,"dSYM",sizeof("dSYM"))))
+#endif
         continue;
       TRY(buf=(char*)alloca(n),"Out of stack space.");
       cat(buf,n,3,p);

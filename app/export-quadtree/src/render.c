@@ -1,6 +1,8 @@
 /**
  * \file
  * Recursively downsample a volume represented by a tile database.
+ *
+ * \todo refactor to sepererate tree traversal from the rendering bits.
  */
 #include <stdio.h>
 #include <string.h>
@@ -23,6 +25,7 @@
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
 //#define DEBUG
+//#DEFIEN ENABLE_PROGRESS_OUTPUT
 //#define DEBUG_DUMP_IMAGES
 //#define PROFILE
 
@@ -30,6 +33,12 @@
 #define DBG(...) LOG(__VA_ARGS__)
 #else
 #define DBG(...)
+#endif
+
+#ifdef ENABLE_PROGRESS_OUTPUT
+#define PROGRESS(...) LOG(__VA_ARGS__)
+#else
+#define PROGRESS(...)
 #endif
 
 #ifdef DEBUG_DUMP_IMAGES
@@ -68,12 +77,16 @@ typedef struct _affine_workspace
 } affine_workspace;
 
 /// Common arguments and memory context used for building the tree
-typedef struct _desc_t
-{ tiles_t tiles;
+typedef struct _desc_t desc_t;
+struct _desc_t
+{ /* PARAMETERS */
+  tiles_t tiles;
   float x_nm,y_nm,z_nm,voxvol_nm3;
   size_t countof_leaf;
+  void *args; // extra arguments to pass to yield()
   handler_t yield;
 
+  /* WORKSPACE */
   nd_t ref;
   int  nbufs;
   nd_t *bufs; //Need 1 for each node on path in tree - so pathlength(root,leaf)
@@ -81,7 +94,30 @@ typedef struct _desc_t
   filter_workspace fws;
   affine_workspace aws;
   float *transform;
-} desc_t;
+
+  /* INTERFACE */
+  /* Returns an array that fills the bounding box \a bbox that corresponds to 
+     the a node on the subdivision tree specified by \a path.
+
+     This usually involves a recursive descent of the tree, so this function is
+     expected to call itself.  Various helper functions below help with the
+     traversal and manage the desc_t workspace.
+
+     The implementation can call desc->yield() to pass data out during the 
+     tree traversal.  For example, this is useful for saving each hierarchically
+     downsampled volume to disk as a root node is rendered.
+   */
+  nd_t (*make)(desc_t *desc,aabb_t bbox,address_t path);
+};
+
+//
+// Forward declare interface functions. See desc_t comments for description of the interface.
+//
+
+// Hierarchical downsampling in memory.
+static nd_t render_child(desc_t *desc, aabb_t bbox, address_t path);
+static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path);
+static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace);
 
 static void filter_workspace__init(filter_workspace *ws)
 { memset(ws,0,sizeof(*ws));
@@ -93,7 +129,7 @@ static void affine_workspace__init(affine_workspace *ws)
   ws->params.boundary_value=0x8000;
 };
 
-static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, handler_t yield)
+static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, handler_t yield, void* args)
 { const float um2nm=1e3;
 
   desc_t out;
@@ -104,10 +140,12 @@ static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, h
   out.z_nm=voxel_um[2]*um2nm;
   out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
   out.countof_leaf=countof_leaf;
+  out.args=args;
   out.yield=yield;
   filter_workspace__init(&out.fws);
   affine_workspace__init(&out.aws);
 
+  out.make=render_child;
   return out;
 }
 
@@ -215,11 +253,15 @@ Error:
 
 static unsigned release_vol(desc_t *desc,nd_t a)
 { size_t i;
-  for(i=0;i<desc->nbufs && desc->bufs[i]!=a;++i); // search for buffer corresponding to a
-  TRY(i<desc->nbufs);                             // ensure one was found
-  TRY(desc->inuse[i]);                            // ensure it was marked inuse. (sanity check)
-  desc->inuse[i]=0;
+  if(!a) return 0;
+  for(i=0;i<desc->nbufs && desc->bufs[i]!=a;++i) {} // search for buffer corresponding to a
   DBG("    release_vol(): buf=%d"ENDL,i);
+  if(i>=desc->nbufs)                                // if a is not from the managed pool, just free it
+  { ndfree(a);
+    return 1;
+  }
+  TRY(desc->inuse[i]);                              // ensure it was marked inuse. (sanity check)
+  desc->inuse[i]=0;
   return 1;
 Error:
   return 0;
@@ -311,7 +353,7 @@ Error:
 /**
  * FIXME: Can not assume all tiles have the same size.
  */
-static nd_t render_leaf(desc_t *desc, aabb_t bbox)
+static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
 { nd_t out=0,in=0,t=0;
   size_t i;
   tile_t *tiles;
@@ -319,14 +361,14 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox)
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
     if(!AABBHit(bbox,TileAABB(tiles[i]))) continue;                             // Select hit tiles    
-    LOG(".");
+    PROGRESS(".");
     // Wait to init until a hit is confirmed.
     if(!in)                                                                     // Alloc on first iteration: in, transform
     { unsigned n;
       in=ndioShape(TileFile(tiles[i]));
       TRY(ndref(in,malloc(ndnbytes(in)),nd_heap));
       n=ndndim(in);
-      NEW(float,desc->transform,(n+1)*(n+1));
+      NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
       TRY(set_ref_shape(desc,in));
     } 
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
@@ -343,7 +385,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox)
     TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
   }
 Finalize:
-  LOG(ENDL);
+  PROGRESS(ENDL);
   ndfree(in);
   return out;
 Error:
@@ -352,7 +394,26 @@ Error:
   goto Finalize;
 }
 
-static nd_t make(desc_t *desc, aabb_t bbox, address_t path);
+static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace)
+{ nd_t t,out=workspace;   
+  // maybe allocate output
+  if(!out)
+  { int64_t *cshape_nm;
+    AABBGet(cbox,0,0,&cshape_nm);
+    TRY(out=alloc_vol(desc,bbox,
+      2.0f*cshape_nm[0]/ndshape(child)[0],
+      2.0f*cshape_nm[1]/ndshape(child)[1],
+           cshape_nm[2]/ndshape(child)[2]));
+  }
+  // paste child into output
+  box2box(desc->transform,out,bbox,child,cbox);
+  TRY(t=aafilt(child,desc->transform,&desc->fws));
+  TRY(xform(out,t,desc->transform,&desc->aws));
+  return out;
+Error:
+  return 0;
+}
+
 /**
  * \returns 0 on failure, otherwise an nd_t array with the rendered subvolume.
  *          The caller is responsible for releaseing the result with
@@ -367,24 +428,12 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
   for(i=0;i<4;++i)
   { nd_t t,c=0;
     TRY(address_push(path,i));
-    c=make(desc,cboxes[i],path);
+    c=desc->make(desc,cboxes[i],path);
     TRY(address_pop(path));
     if(!c) continue;
-    // maybe allocate output
-    if(!out)
-    { int64_t *cshape_nm;
-      AABBGet(cboxes[i],0,0,&cshape_nm);
-      TRY(out=alloc_vol(desc,bbox,
-        2.0f*cshape_nm[0]/ndshape(c)[0],
-        2.0f*cshape_nm[1]/ndshape(c)[1],
-             cshape_nm[2]/ndshape(c)[2]));
-    }
-    // paste child into output
-    box2box(desc->transform,out,bbox,c,cboxes[i]);
-    AABBFree(cboxes[i]);
-    TRY(t=aafilt(c,desc->transform,&desc->fws));
+    out=render_child_to_parent(desc,bbox,path,c,cboxes[i],out);
     release_vol(desc,c);
-    TRY(xform(out,t,desc->transform,&desc->aws));
+    AABBFree(cboxes[i]);
   }
   return out;
 Error:
@@ -393,20 +442,81 @@ Error:
   return 0;
 }
 
-
 /// Renders a volume that fills \a bbox fro \a tiles
-static nd_t make(desc_t *desc, aabb_t bbox, address_t path)
+static nd_t render_child(desc_t *desc, aabb_t bbox, address_t path)
 { nd_t out=0;
-  LOG("--- Address: %-20u ---"ENDL, (unsigned)address_to_int(path,10));
+  DBG("--- Address: %-20u ---"ENDL, (unsigned)address_to_int(path,10));
   if(isleaf(desc,bbox))
-    out=render_leaf(desc,bbox);
+    out=render_leaf(desc,bbox,path);
   else
     out=render_node(desc,bbox,path);
   if(out)
-    TRY(desc->yield(out,path));
+    TRY(desc->yield(out,path,desc->args));
   return out;
 Error:
   return 0;
+}
+
+//
+// JUST THE ADDRESS SEQUENCE 
+// yielded in oreder of dependency, leaves (no dependencies) first.
+//
+static nd_t addr_seq__child(desc_t *desc, aabb_t bbox, address_t path)
+{
+  if(!isleaf(desc,bbox))
+    render_node(desc,bbox,path);
+  desc->yield(0,path,desc->args);
+  return 0;
+}
+static nd_t addr_seq__compose_child(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace)
+{ return 0;}
+static void setup_print_addresses(desc_t *desc)
+{ desc->make=addr_seq__child;
+}
+
+//
+// RENDER JUST THE TARGET ADDRESS
+// target address
+static address_t target__addr=0;
+static loader_t target__load_func=0;
+static nd_t target__load(desc_t *desc, aabb_t bbox, address_t path)
+{ unsigned n;
+  nd_t out=target__load_func?target__load_func(path):0;
+  if(out)
+  { n=ndndim(out);
+    NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
+    TRY(set_ref_shape(desc,out));
+  }
+  return out;
+Error:
+  return 0;
+}
+static nd_t target__get_child(desc_t *desc, aabb_t bbox, address_t path)
+{ nd_t out=0;
+  if(address_eq(path,target__addr))
+  { if(isleaf(desc,bbox))
+      out=render_leaf(desc,bbox,path);
+    else
+    { desc->make=target__load;
+      out=render_node(desc,bbox,path);
+      desc->make=target__get_child;
+    }
+
+    if(out)
+      TRY(desc->yield(out,path,desc->args));
+  } else
+  { if(!isleaf(desc,bbox))
+      render_node(desc,bbox,path);
+  }
+  
+  return out;
+Error:
+  return 0;
+}
+static void target__setup(desc_t *desc, address_t target, loader_t loader)
+{ target__addr=target;
+  target__load_func=loader;
+  desc->make=target__get_child;
 }
 
 // === INTERFACE ===
@@ -434,16 +544,79 @@ Error:
  * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
  * \param[in]   yield        Callback that handles nodes in the tree when they
  *                           are done being rendered.
+ * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield)
+unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield);
+  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,args);
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));
   TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
-  make(&desc,bbox,path);
+  desc.make(&desc,bbox,path);
+Finalize:
+  cleanup_desc(&desc);
+  AABBFree(bbox);
+  free_address(path);
+  return ok;
+Error:
+  ok=0;
+  goto Finalize;
+}
+
+/**
+ * \param[in]   tiles        Source tile database.
+ * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
+ * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
+ * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
+ * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
+ * \param[in]   yield        Callback that handles nodes in the tree when they
+ *                           are ready.
+ * \param[in]   args         Additional arguments to be passed to yeild.
+ */
+unsigned addresses(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void* args)
+{ unsigned ok=1;
+  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,args);
+  aabb_t bbox=0;
+  address_t path=0;
+  TRY(bbox=sub(tiles,ori,size));
+  TRY(preallocate(&desc,bbox));
+  TRY(path=make_address());
+  setup_print_addresses(&desc);
+  desc.make(&desc,bbox,path);
+Finalize:
+  cleanup_desc(&desc);
+  AABBFree(bbox);
+  free_address(path);
+  return ok;
+Error:
+  ok=0;
+  goto Finalize;
+}
+
+/**
+ * \param[in]   tiles        Source tile database.
+ * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
+ * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
+ * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
+ * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
+ * \param[in]   yield        Callback that handles nodes in the tree when they
+ *                           are ready.
+ * \param[in]   yield_args   Additional arguments to be passed to yeild.
+ * \param[in]   loader       Function that loads the data at the node specified by an address.
+ * \param[in]   target       The address of the tree to target.
+ */
+unsigned render_target(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
+{ unsigned ok=1;
+  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,yield_args);
+  aabb_t bbox=0;
+  address_t path=0;
+  TRY(bbox=sub(tiles,ori,size));
+  TRY(preallocate(&desc,bbox));
+  TRY(path=make_address());
+  target__setup(&desc,target,loader);
+  desc.make(&desc,bbox,path);
 Finalize:
   cleanup_desc(&desc);
   AABBFree(bbox);

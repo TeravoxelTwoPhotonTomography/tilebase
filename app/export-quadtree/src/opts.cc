@@ -7,9 +7,11 @@
 #else
 #include "dirent.h"
 #endif
+#include "address.h"
 #include "opts.h"
  opts_t OPTS={0}; // instance the OPTS global variable (declared in opts.h)
 #include <iostream>
+#include <errno.h>
 #include <sstream>
 #include <cmath>
 #include <boost/program_options.hpp>
@@ -100,6 +102,28 @@ struct ZeroToOne
 ostream &operator<<(ostream &stream, ZeroToOne  s) {return stream<<s.v_;}
 istream &operator>>(istream &stream, ZeroToOne &s) {return s.parse(stream); }
 
+struct Address
+{ address_t v_;
+  Address():v_(0){}
+  Address(const Address& copy):v_(0) {v_=copy_address(copy.v_);}
+  Address(string v):v_(0) { istringstream ss(v); parse(ss); }
+  ~Address() {free_address(v_);v_=0;}
+  istream& parse(istream& in)
+  { string s;
+    char *end;
+    unsigned v;
+    in>>s;
+    v=strtoul(s.c_str(),&end,10);
+    if(!v)
+      if(errno) {perror("Could not parse as integer."); return in;}
+    v_=address_from_int(v,end-s.c_str(),10);
+    return in;
+  }
+  unsigned ok() {return v_!=NULL; }
+};
+ostream &operator<<(ostream &stream, Address  s) {char path[1024]={0};return stream<<address_to_path(path,1024,s.v_);}
+istream &operator>>(istream &stream, Address &s) {return s.parse(stream); }
+
 struct dir
 { DIR *d_;
   dir(const string& s):d_(0) {d_=opendir(s.c_str());}
@@ -155,6 +179,14 @@ static void validate(any &v,const vector<string>& vals,ZeroToOne*,int)
   return;
 }
 
+static void validate(any &v,const vector<string>& vals,Address*,int)
+{ const string& o=validators::get_single_string(vals);
+  Address a(o);
+  if(!a.ok())
+    throw validation_error(validation_error::invalid_option_value);
+  v=any(Address(o));
+  return;
+}
 //
 // === HELPERS ===
 //
@@ -180,6 +212,7 @@ static std::string    g_output_path;
 static std::string    g_dst_pattern;
 static HumanReadibleSize g_countof_leaf;
 static TileBaseFormat g_src_fmt("");
+static Address        g_target_address;
 //
 // === OPTION PARSER ===
 //
@@ -199,7 +232,9 @@ unsigned parse_args(int argc, char *argv[])
   try
   {
     cmdline_options.add_options()
-      ("help", "Print this help message.")
+      ("help","Print this help message.")
+      ("print-addresses","Print the addresses of each node in the tree in order of dependency.")
+      ("target-address",value<Address>(&g_target_address),"Render target address in the tree from it's children.")
       ;
     file_opts.add_options() 
       ("source-path,i",
@@ -259,6 +294,7 @@ unsigned parse_args(int argc, char *argv[])
       { cout<<usage<<endl<<cmdline_options<<endl;
         return 0;
       }
+    OPTS.flag_print_addresses=v.count("print-addresses");
     notify(v);
   }
   catch(std::exception& e)
@@ -271,6 +307,7 @@ unsigned parse_args(int argc, char *argv[])
     cerr<<"Unknown error!"<<endl<<usage<<endl<<cmdline_options<<endl;
     return 0;
   }
+  OPTS.target=g_target_address.v_;
   OPTS.ox=ox.v_;
   OPTS.oy=oy.v_;
   OPTS.oz=oz.v_;

@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "tilebase.h"
-#include "src/opts.h"
 #include "src/address.h"
 #include "src/render.h"
 #include "src/mkpath.h"
+#include "src/opts.h"
 
 #ifdef _MSC_VER
 #define snprintf _snprintf
@@ -33,26 +33,7 @@
 #define DBG(...)
 #endif
 
-/**
- * Renders address to something like "1/2/0/0/4/"
- * \param[in] path    Buffer into which to render the string.
- * \param[in] n       size of the buffer \a path in bytes.
- * \param[in] address The address to render.
- */
-char* address_to_path(char* path, int n, address_t address)
-{ unsigned k;
-  char *op=path;
-  for(address=address_begin(address);address&&n>=0;address=address_next(address))
-  { k=snprintf(path,n,"%u%c",address_id(address),PATHSEP);
-    path+=k;
-    n-=k;
-  }
-  // remove terminal path separator
-  if(path!=op) path[-1]='\0';
-  return (n>=0)?path:0;
-}
-
-unsigned save(nd_t vol, address_t address)
+unsigned save(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
        path[1024]={0};  
   size_t n;
@@ -75,13 +56,52 @@ Error:
   goto Finalize;
 }
 
+nd_t load(address_t address)
+{ char full[1024]={0},
+       path[1024]={0};  
+  size_t n;
+  nd_t out=0;
+  ndio_t f=0;
+  TRY(address_to_path(path,countof(path),address));
+  TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);  
+  TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
+  printf("LOADING %s"ENDL,full);
+#if 1
+  TRY(f=ndioOpen(full,NULL,"r"));
+  TRY(out=ndioShape(f));
+  TRY(ndref(out,malloc(ndnbytes(out)),nd_heap));
+  TRY(ndioRead(f,out));
+#endif
+Finalize:
+  ndioClose(f);
+  return out;
+Error:
+  ndfree(out); out=0;
+  goto Finalize;
+}
+
+static unsigned print_addr(nd_t v, address_t address, void* args)
+{ FILE* fp=args;
+  char path[1024]={0},*t;
+  fprintf(fp,"-- %-5d  %s"ENDL,
+    (int)address_to_int(address,10),
+    (t=address_to_path(path,countof(path),address))?t:"(null)");
+  return 0;
+}
+
 int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
   TRY(parse_args(argc,argv));
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
-  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save));
+  if(OPTS.flag_print_addresses)
+    TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,print_addr,stdout));
+  if(OPTS.target)
+    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL,load,address_from_int(0,1,10)));
+  else
+    TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL));
+  
 Finalize:
   TileBaseClose(tiles); 
   //LOG("Press <ENTER>"ENDL); getchar();

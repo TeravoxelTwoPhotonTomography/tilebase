@@ -2,6 +2,8 @@
  * \file
  * Metadata format protobuf-based v0.
  */
+#include <stdlib.h>
+#include <stdio.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/text_format.h>

@@ -113,7 +113,9 @@ int main(int argc, char* argv[])
   
 Finalize:
   TileBaseClose(tiles); 
+#ifdef _MSC_VER //helps with msvc debugging
   LOG("Press <ENTER>"ENDL); getchar();
+#endif
   return ecode;
 Error:
   ecode=1;

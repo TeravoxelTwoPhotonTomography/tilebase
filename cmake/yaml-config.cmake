@@ -39,7 +39,7 @@ else()
   ExternalProject_Add(yaml
     URL ${YAML_URL}
     URL_MD5 ${YAML_MD5}
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure;--prefix=<INSTALL_DIR>;--with-pic
     )
   get_target_property(YAML_ROOT_DIR yaml _EP_INSTALL_DIR)
   set(YAML_INCLUDE_DIR ${YAML_ROOT_DIR}/include CACHE PATH "Path to yaml.h")

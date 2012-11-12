@@ -217,13 +217,13 @@ static Address        g_target_address;
 // === OPTION PARSER ===
 //
 
-static char *basename(char* argv0)
+static char *basename_(char* argv0)
 { char *r = strrchr(argv0,PATHSEP);
   return r?(r+1):argv0;
 }
 
 unsigned parse_args(int argc, char *argv[])
-{ string usage=string("Usage: ")+string(basename(argv[0]))+" [options] <source-path> <dest-path>";
+{ string usage=string("Usage: ")+string(basename_(argv[0]))+" [options] <source-path> <dest-path>";
   options_description cmdline_options("General options"),
                       file_opts      ("File options"),
                       param_opts     ("Parameters");

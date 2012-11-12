@@ -7,7 +7,7 @@ include(FindPackageHandleStandardArgs)
 # === PACKAGE ===
 #
 
-set(PROTBUF_URL http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz)
+set(PROTOBUF_URL http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz)
 set(PROTOBUF_MD5 dc84e9912ea768baa1976cb7bbcea7b5)
 
 if(WIN32)
@@ -36,7 +36,7 @@ else()
     ExternalProject_Add(protobuf
       URL     ${PROTOBUF_URL}
       URL_MD5 ${PROTOBUF_MD5}
-      CONFIGURE_COMMAND <SOURCE_DIR>/configure;--prefix=<INSTALL_DIR>
+      CONFIGURE_COMMAND <SOURCE_DIR>/configure;--prefix=<INSTALL_DIR>;--with-pic
     )
   endif()
   set(PROP _EP_INSTALL_DIR)

@@ -26,7 +26,7 @@
 #define LOG(...) fprintf(stderr,__VA_ARGS__) 
 #define TRY(e)   do{if(!(e)) { DBG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)
 #else
@@ -83,9 +83,13 @@ Error:
 static unsigned print_addr(nd_t v, address_t address, void* args)
 { FILE* fp=args;
   char path[1024]={0},*t;
-  fprintf(fp,"-- %-5d  %s"ENDL,
+#ifdef FANCY
+  fprintf(fp,"-- %-10d  %s"ENDL,
     (int)address_to_int(address,10),
     (t=address_to_path(path,countof(path),address))?t:"(null)");
+#else
+  fprintf(fp,"%u"ENDL,(unsigned)address_to_int(address,10));
+#endif
   return 0;
 }
 

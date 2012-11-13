@@ -28,10 +28,10 @@
 //#define DEBUG_SEARCH
 
 #define ENDL       "\n"
-#define LOG(...)   fprintf(stdout,__VA_ARGS__)
+#define LOG(...)   fprintf(stderr,__VA_ARGS__)
 #define TRY(e,msg) do{ if(!(e)) {LOG("%s(%d): %s"ENDL "\tExpression evaluated to false."ENDL "\t%s"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e,msg); breakme(); goto Error; }} while(0)
 #define NEW(type,e,nelem) TRY((e)=(type*)malloc(sizeof(type)*(nelem)),"Memory allocation failed.")
-#define SILENTTRY(e,msg) do{ if(!(e)) { goto Error; }} while(0)
+#define SILENTTRY(e,msg) do{ if(!(e)) { goto SilentError; }} while(0)
 #if 0
 #define DBG(...) LOG(__VA_ARGS__)
 #else
@@ -79,7 +79,8 @@ static int has_extension(const char* fname,size_t sizeof_fname, const char* ext,
   return len==(sizeof_ext-1) //"sizeof" includes the terminating NULL
       && (0==strncmp(dot+1,ext,len));
 Error:
-  //LOG("\tFile: %s"ENDL,fname);
+  LOG("\tFile: %s"ENDL,fname);
+SilentError:
   return 0;
 }
 
@@ -131,6 +132,8 @@ static metadata_api_t* load(const char *path, const char *fname)
 Finalize:
   return api;
 Error:
+  LOG("\t%s"ENDL "\t%s"ENDL,path,fname);
+SilentError:
   if(lib) { FreeLibrary((HMODULE)lib); lib=NULL; }
   goto Finalize;
 }

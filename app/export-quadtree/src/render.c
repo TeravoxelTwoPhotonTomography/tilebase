@@ -350,6 +350,14 @@ Error:
   return 0;
 }
 
+static int any_tiles_in_box(tile_t *tiles, size_t ntiles, aabb_t bbox)
+{ size_t i;
+  for(i=0;i<ntiles;++i)
+    if(AABBHit(bbox,TileAABB(tiles[i])))
+      return 1;
+  return 0;
+}
+
 /**
  * FIXME: Can not assume all tiles have the same size.
  */
@@ -465,7 +473,8 @@ static nd_t addr_seq__child(desc_t *desc, aabb_t bbox, address_t path)
 {
   if(!isleaf(desc,bbox))
     render_node(desc,bbox,path);
-  desc->yield(0,path,desc->args);
+  if(any_tiles_in_box(TileBaseArray(desc->tiles),TileBaseCount(desc->tiles),bbox)) // cull empty nodes
+    desc->yield(0,path,desc->args);
   return 0;
 }
 static nd_t addr_seq__compose_child(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace)

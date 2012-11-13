@@ -85,6 +85,14 @@ Error:
   return 0;
 }
 
+static int reserve(address_t self, unsigned capacity)
+{ if(capacity>self->cap)
+    REALLOC(int,self->ids,self->cap=capacity);
+  return 1;
+Error:
+  return 0;
+}
+
 /** Add a node to the end of the path. */
 address_t address_push(address_t self, int i)
 { if(self->sz+1>=self->cap)
@@ -115,8 +123,10 @@ address_t address_from_int(uint64_t v, size_t ndigits, uint64_t base)
 { size_t i;
   address_t out=0;
   TRY(out=make_address());
+  TRY(reserve(out,ndigits));
+  out->sz=ndigits;
   for(i=0;i<ndigits;++i)
-  { if(v) TRY(address_push(out,(v-1)%base)); // 0 is root.  digits 1-4 address nodes on the path.
+  { out->ids[ndigits-i-1]=v?(v-1)%base:0;    // 0 is root.  digits 1-4 address nodes on the path.
     v/=base;
   }
   return out;

@@ -123,6 +123,8 @@ address_t address_from_int(uint64_t v, size_t ndigits, uint64_t base)
 { size_t i;
   address_t out=0;
   TRY(out=make_address());
+  if(v==0)
+    return out;
   TRY(reserve(out,ndigits));
   out->sz=ndigits;
   for(i=0;i<ndigits;++i)

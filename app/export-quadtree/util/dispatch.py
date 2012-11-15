@@ -77,7 +77,7 @@ class _linear_scheduler:
     return self._cid
 
 class _group_scheduler:
-  def __init__(self,n=7):
+  def __init__(self,n=4):
     self._cid=0;
     self._queue={}
     self._n=n
@@ -92,7 +92,7 @@ class _group_scheduler:
       d.extend(self._deps(k))
     d=set(d)
     for k,v in self._queue.iteritems():
-      if len(v["items"])<7 and not k in d:
+      if len(v["items"])<self._n and not k in d:
         key,g=k,v
         break
     if g is None: #new group      
@@ -163,7 +163,7 @@ class Job:
 class JobTree:
   def __init__(self,addresses,scheduler):
     self.tree=Job(scheduler)
-    for line in addresses:
+    for line in addresses: #sorted(addresses,lambda a,b: ifthen(len(a)==len(b),cmp(a,b),cmp(len(a),len(b))),reverse=True):
       s=self.tree;
       if(line.strip()=="0"):
         continue
@@ -171,13 +171,19 @@ class JobTree:
         t=s._dependencies.get(c,Job(scheduler))
         s._dependencies[c]=t
         s=t
-  def submit(self,address='',job=None):
+  def iterjobs(self,address='',job=None): 
     if not job:
       job=self.tree
-    #print address
     for k,v in job.iteritems():
-      self.submit(address+k,v)
-    job.submit(address)
+      for a,j in self.iterjobs(address+k,v):
+        yield a,j
+    yield address,job
+  def submit(self,address='',job=None):
+    addr_cmp=lambda a,b: ifthen(len(a)==len(b),cmp(a,b),cmp(len(a),len(b)))
+    pair_cmp=lambda (a0,j0),(a1,j1): addr_cmp(a0,a1)
+    for address,job in sorted(self.iterjobs(),pair_cmp,reverse=True):
+      print address,job
+      job.submit(address)
     return self
   def dispatch(self):
     return self.tree._scheduler.dispatch()

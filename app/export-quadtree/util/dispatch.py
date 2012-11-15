@@ -1,4 +1,4 @@
-#!/us__file__ python
+#!/bin/env python
 """
 Parse addresses from export-quadtree and dispatch cluster jobs with the correct
 dependencies.
@@ -11,7 +11,28 @@ addresses   An iterable with an address for each element.
 
 import sys
 
+do_only_first_group=0
+disable_qsub=0
+
+### PYTHON24 ADAPT ###
+def ifthen(predicate,a,b): 
+  if predicate:
+    return a
+  else:
+    return b
+
+### COMMAND LINE GENERATING FUNCTIONS ###
+
+GROUP_COMMAND=lambda addresses:["python",__file__]+sys.argv[1:]+['--target-group']+addresses
+def QSUB_COMMAND(addresses,holds):
+  holdopt=lambda holds: ifthen(holds,['-hold_jid',','.join(map(str,holds))],[])
+  return 'qsub -terse -V -N clackn-mousebrain-export -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
+def NODE_COMMAND(index,address):
+  rootcmd=sys.argv[1:sys.argv.index('--target-group')]
+  return rootcmd+['--target-address',address,'--gpu',str(index)]
+
 ### UTILITIES ###
+
 def intersect(a,b):
   return list(set(a)&set(b))
 
@@ -23,7 +44,7 @@ def exec_get_addresses():
   e=Popen(sys.argv[1:]+['--print-addresses'],stdout=PIPE,stderr=sys.stderr)
   return [x for x in e.stdout]
 
-def exec_group(addresses,dependencies):
+def exec_group(addresses,holds):
   '''
   returns a job id
   dependencies should be job id's to hold on
@@ -32,14 +53,19 @@ def exec_group(addresses,dependencies):
   from subprocess import Popen,PIPE
   print '---'
   print 'ADDRESSES',addresses
-  print 'HOLDS    ',dependencies
+  print 'HOLDS    ',holds
   sys.stdout.flush()
-  e=Popen(["python",__file__]+sys.argv[1:]+['--target-group']+addresses,stdout=PIPE,stderr=sys.stderr)
-  for x in e.stdout:
-    return int(x.strip())
+  print ' '.join(QSUB_COMMAND(addresses,holds))
+  if disable_qsub:
+    return 12345
+  else:
+    e=Popen(QSUB_COMMAND(addresses,holds),stdout=PIPE,stderr=sys.stderr)
+    for x in e.stdout:
+      return x
 
 
 ### SCHEDULERS ###
+
 class _linear_scheduler:
   def __init__(self):
     self._cid=0;
@@ -85,7 +111,10 @@ class _group_scheduler:
     def launch(k):
       q[k]["jid"]=exec_group(q[k]["items"],holds(k))
       return q[k]["jid"]
-    print map(launch,sorted(q.keys()))
+    if do_only_first_group:
+      print launch(sorted(q.keys())[0])
+    else:
+      print map(launch,sorted(q.keys()))
 
   def toposort(self):
     '''iterate over jobs in topological order
@@ -114,10 +143,11 @@ class _group_scheduler:
         yield e
 
 ### JOB ###
+
 class Job:
   def __init__(self,scheduler,jid=None,deps=None):
     self._jobid       =jid
-    self._dependencies=deps if deps else {}
+    self._dependencies=ifthen(deps,deps,{}) #deps if deps else {}
     self._scheduler   =scheduler
   def _deps(self):
     return list(set([v._jobid for v in self._dependencies.itervalues() if v._jobid is not None]))
@@ -126,7 +156,7 @@ class Job:
   def __str__(self):
     return "Job(%s)"%str(self._jobid)+ str(self._deps())
   def submit(self,address):
-    a=address if address else '0'
+    a=ifthen(address,address,'0') #address if address else '0'
     self._jobid=self._scheduler.submit(a,self._deps());
     
 ### JOBTREE ###
@@ -153,16 +183,20 @@ class JobTree:
     return self.tree._scheduler.dispatch()
 
 ### MAIN ###
+
 if __name__=='__main__':
   from pprint import pprint
   if '--target-group' in sys.argv:
     ### Targets each individual address in a group to one gpu
     import random
-    for i,a in enumerate(sys.argv[sys.argv.index('--target-group')+1:]):
-      # should be a popen
-      print>>sys.stderr,sys.argv[1:sys.argv.index('--target-group')]+['--target-address',a,'--gpu',str(i)]
-    # WAIT FOR CHILD PROCESSES TO TERMINATE
+    from subprocess import Popen
+    addresses=sys.argv[sys.argv.index('--target-group')+1:]
+    for c in [' '.join(NODE_COMMAND(i,a)) for i,a in enumerate(addresses)]:
+      print>>sys.stderr,c
+    subjobs=[Popen(NODE_COMMAND(i,a)) for i,a in enumerate(addresses)]
     print>>sys.stdout,random.randint(0,9999999) #simulates qsub's job id return
+    for j in subjobs: # WAIT FOR CHILD PROCESSES TO TERMINATE
+      j.wait()
   else:
     ### Grabs addresses and schedules jobs
     GroupScheduler =_group_scheduler()

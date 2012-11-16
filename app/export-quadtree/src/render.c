@@ -25,7 +25,7 @@
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
 //#define DEBUG
-//#DEFIEN ENABLE_PROGRESS_OUTPUT
+#define ENABLE_PROGRESS_OUTPUT
 //#define DEBUG_DUMP_IMAGES
 //#define PROFILE
 

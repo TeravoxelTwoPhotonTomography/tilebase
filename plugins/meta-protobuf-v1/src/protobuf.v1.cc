@@ -69,7 +69,11 @@ typedef google::protobuf::Message      desc_t;
 /// \todo protect globals with a mutex
 static int g_silent=0; ///< Use to turn logging to stderr on/off.
 
+#if 1
 static void toggle_silence() { g_silent=!g_silent; }
+#else
+static void toggle_silence() { }
+#endif
 
 //
 // CONTEXT
@@ -188,7 +192,8 @@ char* find(char* out,size_t n, const char* path, const char *ext)
   TRYMSG(closedir(dir)>=0,strerror(errno));
   return out;
 Error:
-  TRYMSG(closedir(dir)>=0,strerror(errno));
+  if(dir)
+    TRYMSG(closedir(dir)>=0,strerror(errno));
   return NULL;
 }
 

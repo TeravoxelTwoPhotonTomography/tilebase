@@ -187,7 +187,8 @@ char* find(char* out,size_t n, const char* path, const char *ext)
   TRYMSG(closedir(dir)>=0,strerror(errno));
   return out;
 Error:
-  TRYMSG(closedir(dir)>=0,strerror(errno));
+  if(dir)
+    TRYMSG(closedir(dir)>=0,strerror(errno));
   return NULL;
 }
 

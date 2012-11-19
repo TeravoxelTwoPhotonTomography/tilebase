@@ -14,6 +14,8 @@
 
 #include "tictoc.h" // for profiling
 
+#define NCHILDREN (8)
+
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
 #define ENDL        "\n"
@@ -24,10 +26,11 @@
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
-//#define DEBUG
+#define DEBUG
+#define PROFILE_MEMORY
 #define ENABLE_PROGRESS_OUTPUT
 //#define DEBUG_DUMP_IMAGES
-//#define PROFILE
+#define PROFILE
 
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)
@@ -40,6 +43,21 @@
 #else
 #define PROGRESS(...)
 #endif
+
+#ifdef PROFILE_MEMORY
+nd_t ndcuda_log(nd_t vol, void *s)
+{ unsigned i;
+  LOG("NDCUDA ALLOC: %g MB [%llu",ndnbytes(vol)*1e-6,(unsigned long long)ndshape(vol)[0]);
+  for(i=1; i<ndndim(vol);++i)
+    LOG(",%llu",(unsigned long long)ndshape(vol)[i]);
+  LOG("]"ENDL);
+  return ndcuda(vol,s);
+}
+#define NDCUDA(v,s) ndcuda_log(v,s)
+#else
+#define NDCUDA(v,s) ndcuda(v,s)
+#endif // PROFILE_MEMORY
+
 
 #ifdef DEBUG_DUMP_IMAGES
 #define DUMP(...) dump(__VA_ARGS__)
@@ -126,7 +144,7 @@ static void filter_workspace__init(filter_workspace *ws)
 
 static void affine_workspace__init(affine_workspace *ws)
 { memset(ws,0,sizeof(*ws));
-  ws->params.boundary_value=0x8000;
+  ws->params.boundary_value=0x8000; // MIN_I16 - TODO: hardcoded here...should be an option
 };
 
 static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, handler_t yield, void* args)
@@ -165,9 +183,9 @@ static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
 /// Count path length from the current node to a leaf
 static int pathlength(desc_t *desc, aabb_t bbox)
 { int i,n=0;
-  aabb_t cboxes[4]={0};  
+  aabb_t cboxes[NCHILDREN]={0};
   if(isleaf(desc,bbox)) return 1;
-  AABBBinarySubdivision(cboxes,4,bbox);
+  AABBBinarySubdivision(cboxes,NCHILDREN,bbox);
   n=pathlength(desc,cboxes[0]);
   for(i=0;i<countof(cboxes);++i) AABBFree(cboxes[i]);
   return n+1;
@@ -196,7 +214,7 @@ static desc_t* set_ref_shape(desc_t *desc, nd_t v)
   { int i;    // preallocate gpu bufs with pixel type corresponding to input
     TRY(ndShapeSet(ndcast(t=ndinit(),ndtype(desc->ref)),0,desc->countof_leaf));
     for(i=0;i<desc->nbufs;++i)
-      TRY(desc->bufs[i]=ndcuda(t,0));
+      TRY(desc->bufs[i]=NDCUDA(t,0));
   }
   return desc;
 Error:
@@ -280,8 +298,8 @@ static unsigned same_shape(nd_t a, nd_t b)
 
 static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
 { if(!ws->gpu[0])
-  { TRY(ws->gpu[0]=ndcuda(vol,0));
-    TRY(ws->gpu[1]=ndcuda(vol,0));
+  { TRY(ws->gpu[0]=NDCUDA(vol,0));
+    TRY(ws->gpu[1]=NDCUDA(vol,0));
     ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
   if(ws->capacity<ndnbytes(vol))
@@ -304,7 +322,7 @@ static unsigned affine_workspace__gpu_resize(affine_workspace *ws, nd_t vol)
 { 
   if(!ws->gpu_xform)
   { TRY(ndreshapev(ndcast(ws->host_xform=ndinit(),nd_f32),2,ndndim(vol)+1,ndndim(vol)+1));
-    TRY(ws->gpu_xform=ndcuda(ws->host_xform,0));
+    TRY(ws->gpu_xform=NDCUDA(ws->host_xform,0));
   }
   return 1;
 Error:
@@ -431,9 +449,9 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
 {   
   unsigned i;
   nd_t out=0;
-  aabb_t cboxes[4]={0};
-  TRY(AABBBinarySubdivision(cboxes,4,bbox));
-  for(i=0;i<4;++i)
+  aabb_t cboxes[NCHILDREN]={0};
+  TRY(AABBBinarySubdivision(cboxes,NCHILDREN,bbox));
+  for(i=0;i<NCHILDREN;++i)
   { nd_t t,c=0;
     TRY(address_push(path,i));
     c=desc->make(desc,cboxes[i],path);

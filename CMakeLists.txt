@@ -84,7 +84,7 @@ macro(tilebase_copy_plugins_to_target _target)
 endmacro()
 
 ### APPS ###
-add_subdirectory(app/export-quadtree)
+add_subdirectory(app/export)
 add_subdirectory(app/tilebase-cache-build)
 
 ###############################################################################

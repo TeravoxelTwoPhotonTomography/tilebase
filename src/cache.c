@@ -53,7 +53,6 @@ struct _tilebase_cache_t
       void (*callback)(tilebase_cache_t); ///< notifier called after the state stack gets popped
       yaml_parser_t parser;
       tiles_t       tiles;  ///< the tiles collection under construction.
-//      tile_t        tile;   ///< the current tile under construction
     } reader;
 
     struct _writer

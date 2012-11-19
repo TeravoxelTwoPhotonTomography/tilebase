@@ -14,15 +14,14 @@
 
 #include "tictoc.h" // for profiling
 
-#define NCHILDREN (8)
-
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
-#define ENDL        "\n"
-#define LOG(...)    fprintf(stderr,__VA_ARGS__) 
-#define TRY(e)      do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto Error;}} while(0)
-#define NEW(T,e,N)  TRY((e)=(T*)malloc(sizeof(T)*(N)))
-#define ZERO(T,e,N) memset((e),0,(N)*sizeof(T))
+#define ENDL          "\n"
+#define LOG(...)      fprintf(stderr,__VA_ARGS__) 
+#define TRY(e)        do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto Error;}} while(0)
+#define NEW(T,e,N)    TRY((e)=(T*)malloc(sizeof(T)*(N)))
+#define ALLOCA(T,e,N) TRY((e)=(T*)alloca(sizeof(T)*(N)))
+#define ZERO(T,e,N)   memset((e),0,(N)*sizeof(T))
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
@@ -100,6 +99,7 @@ struct _desc_t
 { /* PARAMETERS */
   tiles_t tiles;
   float x_nm,y_nm,z_nm,voxvol_nm3;
+  size_t nchildren; // subdivision factor.  must be power of 2. 4 means subdivision will be on x and y, 8 is x,y, and z
   size_t countof_leaf;
   void *args; // extra arguments to pass to yield()
   handler_t yield;
@@ -147,7 +147,7 @@ static void affine_workspace__init(affine_workspace *ws)
   ws->params.boundary_value=0x8000; // MIN_I16 - TODO: hardcoded here...should be an option
 };
 
-static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, handler_t yield, void* args)
+static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { const float um2nm=1e3;
 
   desc_t out;
@@ -157,6 +157,7 @@ static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t countof_leaf, h
   out.y_nm=voxel_um[1]*um2nm;
   out.z_nm=voxel_um[2]*um2nm;
   out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
+  out.nchildren=nchildren;
   out.countof_leaf=countof_leaf;
   out.args=args;
   out.yield=yield;
@@ -183,17 +184,22 @@ static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
 /// Count path length from the current node to a leaf
 static int pathlength(desc_t *desc, aabb_t bbox)
 { int i,n=0;
-  aabb_t cboxes[NCHILDREN]={0};
+  aabb_t *cboxes=0;
+  ALLOCA(aabb_t,cboxes,desc->nchildren);
+  ZERO(  aabb_t,cboxes,desc->nchildren);
   if(isleaf(desc,bbox)) return 1;
-  AABBBinarySubdivision(cboxes,NCHILDREN,bbox);
+  AABBBinarySubdivision(cboxes,desc->nchildren,bbox);
   n=pathlength(desc,cboxes[0]);
-  for(i=0;i<countof(cboxes);++i) AABBFree(cboxes[i]);
+  for(i=0;i<desc->nchildren;++i) AABBFree(cboxes[i]);
   return n+1;
+Error:
+  return 0;
 }
 
 /** This and set_ref_shape() allocate space required to render the subdivision tree. */
 static int preallocate(desc_t *desc, aabb_t bbox)
-{ size_t n=pathlength(desc,bbox);
+{ size_t n;
+  TRY(n=pathlength(desc,bbox));
   NEW(nd_t,desc->bufs,n);
   ZERO(nd_t,desc->bufs,n);
   NEW(int,desc->inuse,n);
@@ -255,7 +261,7 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox, int64_t x_nm, int64_t y_nm, int
   TRY(i<desc->nbufs);                           // check that one was available  
   TRY(v=desc->bufs[i]);                         // ensure bufs was init'd - see set_ref_shape()
   desc->inuse[i]=1;
-  DBG("    alloc_vol(): [%3d] buf=%d"ENDL,sum(desc->nbufs,desc->inuse),i);
+  DBG("    alloc_vol(): [%3u] buf=%u"ENDL,(unsigned)sum(desc->nbufs,desc->inuse),(unsigned)i);
   if(resize)
   { for(i=0;i<ndim;++i) // set spatial dimensions
       TRY(ndShapeSet(v,i,shape_nm[i]/res[i]));
@@ -273,7 +279,7 @@ static unsigned release_vol(desc_t *desc,nd_t a)
 { size_t i;
   if(!a) return 0;
   for(i=0;i<desc->nbufs && desc->bufs[i]!=a;++i) {} // search for buffer corresponding to a
-  DBG("    release_vol(): buf=%d"ENDL,i);
+  DBG("    release_vol(): buf=%u"ENDL,(unsigned)i);
   if(i>=desc->nbufs)                                // if a is not from the managed pool, just free it
   { ndfree(a);
     return 1;
@@ -449,9 +455,11 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
 {   
   unsigned i;
   nd_t out=0;
-  aabb_t cboxes[NCHILDREN]={0};
-  TRY(AABBBinarySubdivision(cboxes,NCHILDREN,bbox));
-  for(i=0;i<NCHILDREN;++i)
+  aabb_t *cboxes=0;
+  ALLOCA(aabb_t,cboxes,desc->nchildren);
+  ZERO(  aabb_t,cboxes,desc->nchildren);
+  TRY(AABBBinarySubdivision(cboxes,desc->nchildren,bbox));
+  for(i=0;i<desc->nchildren;++i)
   { nd_t t,c=0;
     TRY(address_push(path,i));
     c=desc->make(desc,cboxes[i],path);
@@ -573,9 +581,9 @@ Error:
  *                           are done being rendered.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void* args)
+unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,args);
+  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));
@@ -602,9 +610,9 @@ Error:
  *                           are ready.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned addresses(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void* args)
+unsigned addresses(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,args);
+  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));
@@ -634,9 +642,9 @@ Error:
  * \param[in]   loader       Function that loads the data at the node specified by an address.
  * \param[in]   target       The address of the tree to target.
  */
-unsigned render_target(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
+unsigned render_target(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,countof_leaf,yield,yield_args);
+  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,yield_args);
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));

@@ -102,6 +102,16 @@ struct ZeroToOne
 ostream &operator<<(ostream &stream, ZeroToOne  s) {return stream<<s.v_;}
 istream &operator>>(istream &stream, ZeroToOne &s) {return s.parse(stream); }
 
+struct FourOrEight
+{ float v_;
+  FourOrEight(): v_(0.0) {}
+  FourOrEight(float v): v_(v) {}
+  FourOrEight(string v) { istringstream ss(v); parse(ss); }
+  istream& parse(istream& in) { return in>>v_; }    
+};
+ostream &operator<<(ostream &stream, FourOrEight  s) {return stream<<s.v_;}
+istream &operator>>(istream &stream, FourOrEight &s) {return s.parse(stream); }
+
 struct Address
 { address_t v_;
   Address():v_(0){}
@@ -179,6 +189,17 @@ static void validate(any &v,const vector<string>& vals,ZeroToOne*,int)
   return;
 }
 
+static void validate(any &v,const vector<string>& vals,FourOrEight*,int)
+{ const string& o=validators::get_single_string(vals);
+  istringstream ss(o);
+  unsigned a;
+  ss>>a;
+  if(a!=4 || a!=8)
+    throw validation_error(validation_error::invalid_option_value);
+  v=any(FourOrEight(o));
+  return;
+}
+
 static void validate(any &v,const vector<string>& vals,Address* _a,int _i)
 { const string& o=validators::get_single_string(vals);
   Address a(o);
@@ -228,6 +249,7 @@ unsigned parse_args(int argc, char *argv[])
                       file_opts      ("File options"),
                       param_opts     ("Parameters");
   ZeroToOne ox,oy,oz,lx,ly,lz;
+  FourOrEight nchildren;
   OPTS.src=OPTS.dst=0;
   OPTS.gpu_id=0;
   try
@@ -270,6 +292,7 @@ unsigned parse_args(int argc, char *argv[])
       ("lx"    ,value<ZeroToOne>(&lx)->default_value(ZeroToOne(1.0)),"")
       ("ly"    ,value<ZeroToOne>(&ly)->default_value(ZeroToOne(1.0)),"")
       ("lz"    ,value<ZeroToOne>(&lz)->default_value(ZeroToOne(1.0)),"Output box depth as a fraction of the total bounding box (0 to 1).")
+      ("nchildren,c",value<FourOrEight>(&nchildren)->default_value(FourOrEight(4)),"Number of times to subdivide at each level of the tree (4 or 8).")
       ("count-of-leaf,n",
            value<HumanReadibleSize>(&g_countof_leaf)->default_value(HumanReadibleSize("64M")),
            "Maximum size of leaf volume in pixels.  "
@@ -309,6 +332,7 @@ unsigned parse_args(int argc, char *argv[])
     cerr<<"Unknown error!"<<endl<<usage<<endl<<cmdline_options<<endl;
     return 0;
   }
+  OPTS.nchildren=nchildren.v_;
   OPTS.target=g_target_address.v_;
   OPTS.ox=ox.v_;
   OPTS.oy=oy.v_;

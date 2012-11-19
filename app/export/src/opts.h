@@ -22,6 +22,7 @@ typedef struct _opts_t
   float ox,oy,oz;
   float lx,ly,lz;
 
+  unsigned nchildren;
   unsigned countof_leaf;
 
   unsigned  flag_print_addresses;

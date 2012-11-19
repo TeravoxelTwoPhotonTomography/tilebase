@@ -102,18 +102,18 @@ int main(int argc, char* argv[])
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
 
   if(OPTS.flag_print_addresses)
-  { TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,print_addr,stdout));
+  { TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,print_addr,stdout));
     goto Finalize;
   }
 
   if(OPTS.target)
   { printf("RENDERING TARGET: ");
     print_addr(0,OPTS.target,stdout);
-    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL,load,OPTS.target));
+    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,save,NULL,load,OPTS.target));
     goto Finalize;
   }
   
-  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.countof_leaf,save,NULL));
+  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,save,NULL));
   
 Finalize:
   TileBaseClose(tiles); 

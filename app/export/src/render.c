@@ -210,6 +210,19 @@ Error:
   return 0;
 }
 
+static int preallocate_for_render_one_target(desc_t *desc, aabb_t bbox)
+{ size_t n=2;
+  //TRY(n=pathlength(desc,bbox));
+  NEW(nd_t,desc->bufs,n);
+  ZERO(nd_t,desc->bufs,n);
+  NEW(int,desc->inuse,n);
+  ZERO(int,desc->inuse,n);
+  desc->nbufs=n;
+  return 1;
+Error:
+  return 0;
+}
+
 static desc_t* set_ref_shape(desc_t *desc, nd_t v)
 { nd_t t;
   if(desc->ref) // init first time only
@@ -431,11 +444,15 @@ static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_
   // maybe allocate output
   if(!out)
   { int64_t *cshape_nm;
+    unsigned n=desc->nchildren;
+    const float s[]={ (n>>=1)?2.0f:1.0f,
+                      (n>>=1)?2.0f:1.0f,
+                      (n>>=1)?2.0f:1.0f };
     AABBGet(cbox,0,0,&cshape_nm);
     TRY(out=alloc_vol(desc,bbox,
-      2.0f*cshape_nm[0]/ndshape(child)[0],
-      2.0f*cshape_nm[1]/ndshape(child)[1],
-           cshape_nm[2]/ndshape(child)[2]));
+      s[0]*cshape_nm[0]/ndshape(child)[0],
+      s[1]*cshape_nm[1]/ndshape(child)[1],
+      s[2]*cshape_nm[2]/ndshape(child)[2]));
   }
   // paste child into output
   box2box(desc->transform,out,bbox,child,cbox);
@@ -616,7 +633,7 @@ unsigned addresses(tiles_t tiles, float voxel_um[3], float ori[3], float size[3]
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));
-  TRY(preallocate(&desc,bbox));
+//TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   setup_print_addresses(&desc);
   desc.make(&desc,bbox,path);
@@ -648,7 +665,7 @@ unsigned render_target(tiles_t tiles, float voxel_um[3], float ori[3], float siz
   aabb_t bbox=0;
   address_t path=0;
   TRY(bbox=sub(tiles,ori,size));
-  TRY(preallocate(&desc,bbox));
+  TRY(preallocate_for_render_one_target(&desc,bbox));
   TRY(path=make_address());
   target__setup(&desc,target,loader);
   desc.make(&desc,bbox,path);

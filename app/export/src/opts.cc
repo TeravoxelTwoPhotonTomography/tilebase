@@ -103,9 +103,9 @@ ostream &operator<<(ostream &stream, ZeroToOne  s) {return stream<<s.v_;}
 istream &operator>>(istream &stream, ZeroToOne &s) {return s.parse(stream); }
 
 struct FourOrEight
-{ float v_;
-  FourOrEight(): v_(0.0) {}
-  FourOrEight(float v): v_(v) {}
+{ unsigned v_;
+  FourOrEight(): v_(4) {}
+  FourOrEight(unsigned v): v_(v) {}
   FourOrEight(string v) { istringstream ss(v); parse(ss); }
   istream& parse(istream& in) { return in>>v_; }    
 };
@@ -194,7 +194,7 @@ static void validate(any &v,const vector<string>& vals,FourOrEight*,int)
   istringstream ss(o);
   unsigned a;
   ss>>a;
-  if(a!=4 || a!=8)
+  if(a!=4 && a!=8)
     throw validation_error(validation_error::invalid_option_value);
   v=any(FourOrEight(o));
   return;

@@ -7,8 +7,8 @@ include(FindPackageHandleStandardArgs)
 # === PACKAGE ===
 #
 
-set(PROTOBUF_URL http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz) 
-set(PROTOBUF_MD5 dc84e9912ea768baa1976cb7bbcea7b5)
+set(PROTOBUF_URL http://dl.dropbox.com/u/782372/Software/protobuf-2.4.1.zip) 
+set(PROTOBUF_MD5 ce3ef48c322ea14016fdf845219f386a)
 
 if(WIN32)
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -16,13 +16,17 @@ if(WIN32)
   else()
     set(PLAT x86)
   endif()
+  # Ideally something like this would work for 64-biut builds: devenv /Command "Build.SolutionPlatforms x64" /Upgrade /SafeMode
+  # The shipped protobuf.sln only has the Win32 configuration built in.
+  # Unfortunantly, you have to make devenv.exe LARGEADDRESSAWARE in order to get the command to run.
+  # So leaving this unfixed for now.  You should manually fixup the protobuf.sln file if necessary.
   if(NOT TARGET protobuf)
     ExternalProject_Add(protobuf
       URL     ${PROTOBUF_URL}
       URL_MD5 ${PROTOBUF_MD5}
       BUILD_IN_SOURCE 1
-      CONFIGURE_COMMAND ""
       LIST_SEPARATOR ^^
+      CONFIGURE_COMMAND ""#devenv /Upgrade /SafeMode /Command "Build.SolutionPlatforms x64" <SOURCE_DIR>/vsprojects/protobuf.sln
       BUILD_COMMAND msbuild /target:protoc /target:libprotobuf /p:Configuration=Debug /p:Platform=${PLAT} <SOURCE_DIR>/vsprojects/protobuf.sln
       INSTALL_COMMAND ""
     )

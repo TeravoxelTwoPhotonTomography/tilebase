@@ -10,6 +10,13 @@
  *  #include "core.h"
  *  \endcode
  *  \todo Use the standard pattern in the master header.
+ *
+ *  \todo [design]  TileBaseOpen* starts trying to read/build the cache.
+ *        When it should probably do nothing but the minimal amount of work to
+ *        make a valid object.  Then, when we want to associate different data/
+ *        configure the thing we can do that with the API and not a seperate
+ *        constructor (see the *OpenWithProgressIndicator constructor).  Not 
+ *        a critical problem as is, but if I wanted to add other callbacks etc.. 
  * 
  *  \author Nathan Clack
  *  \date   July 2012
@@ -24,7 +31,11 @@ extern "C" {
 typedef struct _tile_t  *tile_t;
 typedef struct _tiles_t *tiles_t;
 
+typedef void (*tilebase_progress_t)(const char* path, void* data);
+
 tiles_t TileBaseOpen(const char *path, const char* format);
+tiles_t TileBaseOpenWithProgressIndicator(const char *path, const char* format,
+                                          tilebase_progress_t callback, void* cbdata);
 void    TileBaseClose(tiles_t self);
 //char*       TileBaseError();
 //void        TileBaseResetError();

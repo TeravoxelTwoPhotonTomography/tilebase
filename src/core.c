@@ -183,6 +183,18 @@ Error:
   return 0;
 }
 
+static int push_many(tiles_t self,tiles_t other)
+{ size_t i=0;
+  if(!other) return 1;
+  TRY(maybe_resize(self,self->sz+other->sz));
+  memcpy(self->tiles+self->sz,other->tiles,other->sz*sizeof(*other->tiles));
+  self->sz+=other->sz;
+  other->sz=0; // effectively transfer the contents to `self`.  `other` must still be closed.
+  return 1;
+Error: 
+  return 0;
+}
+
 /**
  * Concatenates two paths stings adding a path seperator.
  * \param[in,out]   out   Must have length of at least \a n.
@@ -208,18 +220,35 @@ Error:
  * Data is expected to be in the leaves.  A leaf is a subdirectory containing 
  * no directories.
  */
-static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
+static unsigned addtiles(tiles_t tiles,const char *path, const char* format, tilebase_progress_t callback, void *cbdata)
 { int any=0;
   char next[1024]={0};
   DIR *dir=0;
   struct dirent *ent;
   TRY(path);
+
+  // First, try to open a cache at path
+  { tiles_t local=0;
+    TileBaseCacheClose(TileBaseCacheRead(TileBaseCacheOpen(path,"r"),&local));
+    if(local)
+    { size_t i;
+      for(i=0;i<local->sz;++i)
+      { if(callback) callback(local->tiles[i]->path,cbdata);
+        TileBaseCacheWrite(tiles->cache,local->tiles[i]->path,local->tiles[i]);
+      }
+      push_many(tiles,local);
+      return 1;
+    }
+    TileBaseClose(local);
+  }
+
+  // No cache, process the directory
   TRY(dir=opendir(path));
   while((ent=readdir(dir)))
   { if(ent->d_type==DT_DIR)
     { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
       { any=1; // has a subdirectory ==> not a leaf
-        if(!addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format)) // maybe add subdirs -- some subdirs might not be valid
+        if(!addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format,callback,cbdata)) // maybe add subdirs -- some subdirs might not be valid
           continue;
       }
     }
@@ -228,6 +257,7 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format)
   if(!any) // then it's a leaf
   { tile_t t=0;
     TRY(push(tiles,t=TileNew(path,format)));
+    if(callback) callback(path,cbdata);
     if(t) // !!! insufficient?...Tile is lazy, so we don't know it's valid at constuction
       TileBaseCacheWrite(tiles->cache,path,t); // this should be able to handle bad tiles by silently failing.
   }
@@ -244,6 +274,22 @@ Error:
  *                   in which case the metadata format will be guessed.
  */
 tiles_t TileBaseOpen(const char* path, const char* format)
+{ return TileBaseOpenWithProgressIndicator(path, format, 0, 0);
+}
+
+/**
+ * Just like TileBaseOpen() but calls callback(path,cbdata) when a tile at 
+ * \a path is added.
+ * Open all the tiles contained in a directory tree rooted at \a path.
+ * \param[in] path     The root patht ot the directory tree containing all the tiles.
+ * \param[in] format   The metadata format for the tiles.  May be the empty string or NULL,
+ *                     in which case the metadata format will be guessed.
+ * \param[in] callback The progress indicator callback.
+ * \param[in] cbdata   A pointer that will be passed to the callback function.
+ *                     Otherwise this is left alone.  Use this to pass state
+ *                     to/from the callback 
+ */
+tiles_t TileBaseOpenWithProgressIndicator(const char *path, const char* format, tilebase_progress_t callback, void *cbdata)
 { tiles_t out=0;
   tilebase_cache_t cache=0;
   if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out))
@@ -252,7 +298,7 @@ tiles_t TileBaseOpen(const char* path, const char* format)
   { NEW( struct _tiles_t,out,1);
     ZERO(struct _tiles_t,out,1);
     out->cache=TileBaseCacheOpen(path,"w");
-    TRY(addtiles(out,path,format));
+    TRY(addtiles(out,path,format,callback,cbdata));
     TileBaseCacheClose(out->cache);
   }
   return out;

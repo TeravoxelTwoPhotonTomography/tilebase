@@ -13,11 +13,19 @@ char *basename(char* r)
   return o?(o+1):r;
 }
 
+void progress(const char *path, void* data)
+{ size_t* c=(size_t*)data;
+  ++*c;
+  printf("."); fflush(stdout);
+}
+
 int main(int argc, char *argv[])
 { char *fmt;
+  size_t count=0;
   if(argc<2)
       printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));
   fmt=(argc==3)?argv[2]:0;
-  TileBaseClose(TileBaseOpen(argv[1],fmt));
+  TileBaseClose(TileBaseOpenWithProgressIndicator(argv[1],fmt,progress,(void*)&count));
+  printf("\nCached %llu tiles\n",(unsigned long long)count);
   return 0;
 }

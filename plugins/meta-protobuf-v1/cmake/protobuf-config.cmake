@@ -7,8 +7,8 @@ include(FindPackageHandleStandardArgs)
 # === PACKAGE ===
 #
 
-set(PROTOBUF_URL http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz)
-set(PROTOBUF_MD5 dc84e9912ea768baa1976cb7bbcea7b5)
+set(PROTOBUF_URL http://dl.dropbox.com/u/782372/Software/protobuf-2.4.1.zip) 
+set(PROTOBUF_MD5 ce3ef48c322ea14016fdf845219f386a)
 
 if(WIN32)
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)

@@ -62,21 +62,24 @@ unsigned save_raveler(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
        path[1024]={0};  
   size_t n;
-  nd_t tmp=0;
+  nd_t tmp=0,tmp2=0;
   int isok=1;
   TRY(ndcopy(tmp=ndheap(vol),vol,0,0));
-  ndShapeSet(tmp,4,1);                                   // select first channel
+  ndShapeSet(tmp,3,1);                                   // select first channel
   ndLinearConstrastAdjust_ip(tmp,nd_u8,-24068,-14428);   // scale it
-  TRY(ndconvert_ip(tmp,nd_u8));
+
+  TRY(tmp2=ndheap(tmp));
+  TRY(ndcopy(tmp2,tmp,0,0));
 
   TRY(address_to_path(path,countof(path),address));
   TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);
   printf("SAVING %s"ENDL,full);
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
-  ndioClose(ndioWrite(ndioOpen(full,NULL,"w"),tmp));
+  ndioClose(ndioWrite(ndioOpen(full,NULL,"w"),tmp2));
 Finalize:
   ndfree(tmp);
+  ndfree(tmp2);
   return isok;
 Error:
   isok=0;

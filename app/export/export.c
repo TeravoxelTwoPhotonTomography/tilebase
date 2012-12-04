@@ -58,6 +58,31 @@ Error:
   goto Finalize;
 }
 
+unsigned save_raveler(nd_t vol, address_t address, void* args)
+{ char full[1024]={0},
+       path[1024]={0};  
+  size_t n;
+  nd_t tmp=0;
+  int isok=1;
+  TRY(ndcopy(tmp=ndheap(vol),vol,0,0));
+  ndShapeSet(tmp,4,1);                                   // select first channel
+  ndLinearConstrastAdjust_ip(tmp,nd_u8,-24068,-14428);   // scale it
+  TRY(ndconvert_ip(tmp,nd_u8));
+
+  TRY(address_to_path(path,countof(path),address));
+  TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);
+  printf("SAVING %s"ENDL,full);
+  TRY(mkpath(full));
+  TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
+  ndioClose(ndioWrite(ndioOpen(full,NULL,"w"),tmp));
+Finalize:
+  ndfree(tmp);
+  return isok;
+Error:
+  isok=0;
+  goto Finalize;
+}
+
 nd_t load(address_t address)
 { char full[1024]={0},
        path[1024]={0};  
@@ -109,16 +134,19 @@ uint64_t nextpow2(uint64_t v)
 int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
+  handler_t on_ready=save;
   TRY(parse_args(argc,argv));
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
+
 
   if(OPTS.flag_raveler_output)
   { aabb_t bbox;
     int64_t *shape=0,s;
     uint64_t v;
     double   f;
+    on_ready=save_raveler;
     printf("--- BEFORE\n");
     TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
     TRY(AABBGet(bbox,0,0,&shape));
@@ -132,10 +160,10 @@ int main(int argc, char* argv[])
     v=nextpow2((double)s/1000.0/OPTS.x_um); // Assumes x and y have same output resolution
     f=v/((double)shape[0]/1000.0/OPTS.x_um);
     OPTS.lx*=f;           // scale
-    OPTS.ox-=0.5*(1.0-f); // center up
+    OPTS.ox+=0.5*(1.0-f); // center up
     f=v/((double)shape[1]/1000.0/OPTS.y_um);
     OPTS.ly*=f;
-    OPTS.oy-=0.5*(1.0-f);
+    OPTS.oy+=0.5*(1.0-f);
     AABBFree(bbox);
     TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
     TRY(AABBGet(bbox,0,0,&shape));
@@ -155,11 +183,11 @@ int main(int argc, char* argv[])
   if(OPTS.target)
   { printf("RENDERING TARGET: ");
     print_addr(0,OPTS.target,stdout);
-    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,save,NULL,load,OPTS.target));
+    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL,load,OPTS.target));
     goto Finalize;
   }
   
-  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,save,NULL));
+  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL));
   
 Finalize:
   TileBaseClose(tiles); 

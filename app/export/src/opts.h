@@ -15,17 +15,18 @@ typedef struct _opts_t
   const char *src_format;
   const char *dst_pattern;
 
-  float x_um;
-  float y_um;
-  float z_um;
+  double x_um;
+  double y_um;
+  double z_um;
 
-  float ox,oy,oz;
-  float lx,ly,lz;
+  double ox,oy,oz;
+  double lx,ly,lz;
 
   unsigned nchildren;
   unsigned countof_leaf;
 
   unsigned  flag_print_addresses;
+  unsigned  flag_raveler_output;
   address_t target; // if not NULL, will try to render target from it's children.
   int gpu_id;
 } opts_t;

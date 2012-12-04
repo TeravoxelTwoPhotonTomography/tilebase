@@ -93,9 +93,9 @@ ostream &operator<<(ostream &stream, HumanReadibleSize  s) {return stream<<s.pri
 istream &operator>>(istream &stream, HumanReadibleSize &s) {return s.parse(stream); }
 
 struct ZeroToOne
-{ float v_;
+{ double v_;
   ZeroToOne(): v_(0.0) {}
-  ZeroToOne(float v): v_(v) {}
+  ZeroToOne(double v): v_(v) {}
   ZeroToOne(string v) { istringstream ss(v); parse(ss); }
   istream& parse(istream& in) { return in>>v_; }    
 };
@@ -179,9 +179,9 @@ static void validate(any &v,const vector<string>& vals,HumanReadibleSize*,int)
 
 static void validate(any &v,const vector<string>& vals,ZeroToOne*,int)
 { const string& o=validators::get_single_string(vals);
-  const float tol=1e-3;
+  const double tol=1e-3;
   istringstream ss(o);
-  float a;
+  double a;
   ss>>a;
   if(a<=-tol || (1.0+tol)<=a)
     throw validation_error(validation_error::invalid_option_value);
@@ -258,7 +258,8 @@ unsigned parse_args(int argc, char *argv[])
       ("help","Print this help message.")
       ("print-addresses","Print the addresses of each node in the tree in order of dependency.")
       ("target-address",value<Address>(&g_target_address),"Render target address in the tree from it's children.")
-      ("gpu",value<int>(&OPTS.gpu_id)->default_value(0),"Use this GPU for acceleration.");
+      ("gpu",value<int>(&OPTS.gpu_id)->default_value(0),"Use this GPU for acceleration.")
+      ("raveler-output","Save using raveler format.  WORK IN PROGRESS.  Currently just enforces some contraints.")
       ;
     file_opts.add_options() 
       ("source-path,i",
@@ -283,9 +284,9 @@ unsigned parse_args(int argc, char *argv[])
           tilebase_format_help_string())
       ;
     param_opts.add_options()
-      ("x_um,x",value<float>(&OPTS.x_um)->default_value(0.5),"Finest pixel size (x "MU"m) to render.")
-      ("y_um,y",value<float>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y "MU"m) to render.")
-      ("z_um,z",value<float>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z "MU"m) to render.")
+      ("x_um,x",value<double>(&OPTS.x_um)->default_value(0.5),"Finest pixel size (x "MU"m) to render.")
+      ("y_um,y",value<double>(&OPTS.y_um)->default_value(0.5),"Finest pixel size (y "MU"m) to render.")
+      ("z_um,z",value<double>(&OPTS.z_um)->default_value(0.5),"Finest pixel size (z "MU"m) to render.")
       ("ox"    ,value<ZeroToOne>(&ox)->default_value(ZeroToOne(0.0)),"")
       ("oy"    ,value<ZeroToOne>(&oy)->default_value(ZeroToOne(0.0)),"")
       ("oz"    ,value<ZeroToOne>(&oz)->default_value(ZeroToOne(0.0)),"Output box origin as a fraction of the total bounding box (0 to 1).")
@@ -320,6 +321,7 @@ unsigned parse_args(int argc, char *argv[])
         return 0;
       }
     OPTS.flag_print_addresses=v.count("print-addresses");
+    OPTS.flag_raveler_output=v.count("raveler-output");
     notify(v);
   }
   catch(std::exception& e)

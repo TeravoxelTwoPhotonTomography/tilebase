@@ -147,7 +147,7 @@ static void affine_workspace__init(affine_workspace *ws)
   ws->params.boundary_value=0x8000; // MIN_I16 - TODO: hardcoded here...should be an option
 };
 
-static desc_t make_desc(tiles_t tiles, float voxel_um[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+static desc_t make_desc(tiles_t tiles, double voxel_um[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { const float um2nm=1e3;
 
   desc_t out;
@@ -396,7 +396,7 @@ static int any_tiles_in_box(tile_t *tiles, size_t ntiles, aabb_t bbox)
 }
 
 /**
- * FIXME: Can not assume all tiles have the same size.
+ * FIXME: Can not assume all tiles have the same size. (fixed: ngc)
  */
 static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
 { nd_t out=0,in=0,t=0;
@@ -575,7 +575,7 @@ static void target__setup(desc_t *desc, address_t target, loader_t loader)
 
 /** Select a subvolume from the total data set using fractional coordinates.  
   */
-aabb_t sub(tiles_t tiles, float o[3], float s[3])
+aabb_t AdjustTilesBoundingBox(tiles_t tiles, double o[3], double s[3])
 { aabb_t bbox;
   int64_t *ori,*shape;
   int i;
@@ -598,12 +598,12 @@ Error:
  *                           are done being rendered.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned render(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+unsigned render(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
   desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=sub(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
   TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   desc.make(&desc,bbox,path);
@@ -627,12 +627,12 @@ Error:
  *                           are ready.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned addresses(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+unsigned addresses(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
   desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=sub(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
 //TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   setup_print_addresses(&desc);
@@ -659,12 +659,12 @@ Error:
  * \param[in]   loader       Function that loads the data at the node specified by an address.
  * \param[in]   target       The address of the tree to target.
  */
-unsigned render_target(tiles_t tiles, float voxel_um[3], float ori[3], float size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
+unsigned render_target(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
 { unsigned ok=1;
   desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,yield_args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=sub(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
   TRY(preallocate_for_render_one_target(&desc,bbox));
   TRY(path=make_address());
   target__setup(&desc,target,loader);

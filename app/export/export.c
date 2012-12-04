@@ -33,6 +33,8 @@
 #define DBG(...)
 #endif
 
+#define max(a,b)  (((a)<(b))?(b):(a))
+
 unsigned save(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
        path[1024]={0};  
@@ -93,6 +95,17 @@ static unsigned print_addr(nd_t v, address_t address, void* args)
   return 0;
 }
 
+uint64_t nextpow2(uint64_t v)
+{ v--;
+  v |= v >> 1;
+  v |= v >> 2;
+  v |= v >> 4;
+  v |= v >> 8;
+  v |= v >> 16;
+  v |= v >> 32;
+  return ++v;
+}
+
 int main(int argc, char* argv[])
 { unsigned ecode=0; 
   tiles_t tiles=0;
@@ -100,6 +113,39 @@ int main(int argc, char* argv[])
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
+
+  if(OPTS.flag_raveler_output)
+  { aabb_t bbox;
+    int64_t *shape=0,s;
+    uint64_t v;
+    double   f;
+    printf("--- BEFORE\n");
+    TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
+    TRY(AABBGet(bbox,0,0,&shape));
+    printf("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
+    printf("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
+                                           ((double)shape[1])/1000.0/OPTS.y_um,
+                                           ((double)shape[2])/1000.0/OPTS.z_um);
+    // expand bounds to next power of 2 in pixels along the x and y dimension.  Make the x and y extent. the same number of pixels.
+    s=max(shape[0],shape[1]);
+    TRY(OPTS.x_um==OPTS.y_um);
+    v=nextpow2((double)s/1000.0/OPTS.x_um); // Assumes x and y have same output resolution
+    f=v/((double)shape[0]/1000.0/OPTS.x_um);
+    OPTS.lx*=f;           // scale
+    OPTS.ox-=0.5*(1.0-f); // center up
+    f=v/((double)shape[1]/1000.0/OPTS.y_um);
+    OPTS.ly*=f;
+    OPTS.oy-=0.5*(1.0-f);
+    AABBFree(bbox);
+    TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
+    TRY(AABBGet(bbox,0,0,&shape));
+    printf("--- AFTER\n");
+    printf("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
+    printf("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
+                                           ((double)shape[1])/1000.0/OPTS.y_um,
+                                           ((double)shape[2])/1000.0/OPTS.z_um);
+    AABBFree(bbox);
+  }
 
   if(OPTS.flag_print_addresses)
   { TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,print_addr,stdout));

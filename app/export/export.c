@@ -26,7 +26,7 @@
 #define LOG(...) fprintf(stderr,__VA_ARGS__) 
 #define TRY(e)   do{if(!(e)) { DBG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)
 #else
@@ -34,6 +34,21 @@
 #endif
 
 #define max(a,b)  (((a)<(b))?(b):(a))
+
+int g_flag_loaded_from_tree=0;
+
+static unsigned print_addr(nd_t v, address_t address, void* args)
+{ FILE* fp=args;
+  char path[1024]={0},*t;
+#ifdef FANCY
+  fprintf(fp,"-- %-10d  %s"ENDL,
+    (int)address_to_int(address,10),
+    (t=address_to_path(path,countof(path),address))?t:"(null)");
+#else
+  fprintf(fp,"%u"ENDL,(unsigned)address_to_int(address,10));
+#endif
+  return 0;
+}
 
 unsigned save(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
@@ -58,17 +73,22 @@ Error:
   goto Finalize;
 }
 
+
 unsigned save_raveler(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
        path[1024]={0};  
   size_t n;
   nd_t tmp=0,tmp2=0;
   int isok=1;
+  
   TRY(ndcopy(tmp=ndheap(vol),vol,0,0));
-  ndShapeSet(tmp,3,1);                                   // select first channel
-  ndLinearConstrastAdjust_ip(tmp,nd_u8,-24068,-14428);   // scale it
+  TRY(ndShapeSet(tmp,3,1));                                   // select first channel
 
-  TRY(tmp2=ndheap(tmp));
+  if(!g_flag_loaded_from_tree)
+  { TRY(ndLinearConstrastAdjust_ip(tmp,nd_u8,-24068,-14428));   // scale it
+    TRY(ndsaturate_ip(tmp,0,255));
+  }
+  TRY(tmp2=ndcast(ndheap(tmp),nd_u8));
   TRY(ndcopy(tmp2,tmp,0,0));
 
   TRY(address_to_path(path,countof(path),address));
@@ -92,6 +112,7 @@ nd_t load(address_t address)
   size_t n;
   nd_t out=0;
   ndio_t f=0;
+  g_flag_loaded_from_tree=1;
   TRY(address_to_path(path,countof(path),address));
   TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);  
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
@@ -110,18 +131,6 @@ Error:
   goto Finalize;
 }
 
-static unsigned print_addr(nd_t v, address_t address, void* args)
-{ FILE* fp=args;
-  char path[1024]={0},*t;
-#ifdef FANCY
-  fprintf(fp,"-- %-10d  %s"ENDL,
-    (int)address_to_int(address,10),
-    (t=address_to_path(path,countof(path),address))?t:"(null)");
-#else
-  fprintf(fp,"%u"ENDL,(unsigned)address_to_int(address,10));
-#endif
-  return 0;
-}
 
 uint64_t nextpow2(uint64_t v)
 { v--;
@@ -150,11 +159,11 @@ int main(int argc, char* argv[])
     uint64_t v;
     double   f;
     on_ready=save_raveler;
-    printf("--- BEFORE\n");
+    DBG("--- BEFORE\n");
     TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
     TRY(AABBGet(bbox,0,0,&shape));
-    printf("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
-    printf("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
+    DBG("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
+    DBG("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
                                            ((double)shape[1])/1000.0/OPTS.y_um,
                                            ((double)shape[2])/1000.0/OPTS.z_um);
     // expand bounds to next power of 2 in pixels along the x and y dimension.  Make the x and y extent. the same number of pixels.
@@ -170,9 +179,9 @@ int main(int argc, char* argv[])
     AABBFree(bbox);
     TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
     TRY(AABBGet(bbox,0,0,&shape));
-    printf("--- AFTER\n");
-    printf("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
-    printf("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
+    DBG("--- AFTER\n");
+    DBG("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
+    DBG("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
                                            ((double)shape[1])/1000.0/OPTS.y_um,
                                            ((double)shape[2])/1000.0/OPTS.z_um);
     AABBFree(bbox);

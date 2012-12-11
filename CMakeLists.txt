@@ -61,11 +61,6 @@ target_link_libraries(tilebase
   ${SHLWAPI}
   ${YAML_LIBRARIES}
 )
-# tile metadata plugins
-file(GLOB PLUGINS plugins/*)
-foreach(PLUGIN ${PLUGINS})
-  add_subdirectory(${PLUGIN})
-endforeach(PLUGIN)
 
 ### macro for copying plugins to build products
 macro(tilebase_copy_plugins_to_target _target)
@@ -82,6 +77,12 @@ macro(tilebase_copy_plugins_to_target _target)
     add_dependencies(${_target} v)
   endforeach()
 endmacro()
+
+### tile metadata plugins
+file(GLOB PLUGINS plugins/*)
+foreach(PLUGIN ${PLUGINS})
+  add_subdirectory(${PLUGIN})
+endforeach(PLUGIN)
 
 ### APPS ###
 add_subdirectory(app/export)
@@ -100,7 +101,6 @@ if(GTEST_FOUND AND TEST_SOURCES)
   include_directories(${GTEST_INCLUDE_DIR})
   
   add_executable(test-tilebase ${TEST_SOURCES})
-
   target_link_libraries(test-tilebase    
     ${GTEST_BOTH_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -111,6 +111,8 @@ if(GTEST_FOUND AND TEST_SOURCES)
     ${PLUGINS}
   )
   nd_copy_plugins_to_target(test-tilebase)
+  gtest_copy_shared_libraries(test-tilebase)
+  tilebase_copy_plugins_to_target(test-tilebase)
   add_test(TestTilebase test-tilebase)
   install(TARGETS test-tilebase
           RUNTIME DESTINATION bin)

@@ -425,6 +425,7 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   }
   return self;
 Error:
+  LOG("\tpath: %s"ENDL "\tmode: %s"ENDL, path?path:"(none)",mode?mode:"(none)");
   TileBaseCacheClose(self);
   return 0;
 }

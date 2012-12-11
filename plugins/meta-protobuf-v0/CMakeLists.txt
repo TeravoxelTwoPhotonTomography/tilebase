@@ -45,6 +45,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
 
   add_definitions(-fPIC)
   add_library(meta-protobuf-v0 MODULE ${ALL})
+  add_dependencies(meta-protobuf-v0 eigen)
   target_link_libraries(meta-protobuf-v0
     tilebase
     ${PROTOBUF_LIBRARY})
@@ -70,6 +71,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
       ${PROTOBUF_LIBRARY}
       )
     add_dependencies(test-meta-protobuf-v0 gtest)
+    gtest_copy_shared_libraries(test-meta-protobuf-v0)
     add_test(TestMetadataProtobufV0 test-meta-protobuf-v0)
     install(TARGETS test-meta-protobuf-v0
           RUNTIME DESTINATION bin)

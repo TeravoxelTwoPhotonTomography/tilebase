@@ -14,7 +14,7 @@
 #define LOG(...)    fprintf(stderr,__VA_ARGS__) 
 #define TRY(e)      do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
-#define restrict __restrict__
+#define restrict __restrict
 
 #define SQRT_2PI (2.5066282746310002)
 

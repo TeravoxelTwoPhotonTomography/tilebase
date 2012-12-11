@@ -37,6 +37,7 @@
 #define ENDL               "\n"
 #define LOG(...)           fprintf(stderr,__VA_ARGS__)
 #define TRY(e)             do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto Error;}} while(0)
+#define TRYLBL(e,lbl)      do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto lbl;}} while(0)
 #define NEW(type,e,nelem)  TRY((e)=(type*)malloc(sizeof(type)*(nelem)))
 #define ZERO(type,e,nelem) memset((e),0,sizeof(type)*nelem)
 #define SAFEFREE(e)        if(e){free(e); (e)=NULL;} 
@@ -183,6 +184,14 @@ Error:
   return 0;
 }
 
+static int pop(tiles_t self)
+{ if(self->sz>0)
+  { TileFree(self->tiles[--self->sz]);
+    self->tiles[self->sz]=0;
+  }
+  return self->sz>0;
+}
+
 static int push_many(tiles_t self,tiles_t other)
 { size_t i=0;
   if(!other) return 1;
@@ -253,15 +262,17 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format, til
       }
     }
   }
-  closedir(dir);
+  
   if(!any) // then it's a leaf
   { tile_t t=0;
     TRY(push(tiles,t=TileNew(path,format)));
     if(callback) callback(path,cbdata);
     if(t) // !!! insufficient?...Tile is lazy, so we don't know it's valid at constuction
-      TileBaseCacheWrite(tiles->cache,path,t); // this should be able to handle bad tiles by silently failing.
+      TRYLBL(TileBaseCacheWrite(tiles->cache,path,t),CacheWriteError); // this should be able to handle bad tiles by silently failing.
   }
   return 1;
+CacheWriteError:
+  pop(tiles);
 Error:
   if(dir) closedir(dir);
   return 0; 
@@ -292,7 +303,7 @@ tiles_t TileBaseOpen(const char* path, const char* format)
 tiles_t TileBaseOpenWithProgressIndicator(const char *path, const char* format, tilebase_progress_t callback, void *cbdata)
 { tiles_t out=0;
   tilebase_cache_t cache=0;
-  if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out))
+  if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out) && out && out->sz>0)
   { TileBaseCacheClose(cache);
   } else
   { NEW( struct _tiles_t,out,1);

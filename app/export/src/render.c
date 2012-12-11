@@ -14,6 +14,10 @@
 
 #include "tictoc.h" // for profiling
 
+#ifdef _MSC_VER
+#define alloca   _alloca
+#endif
+
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
 #define ENDL          "\n"

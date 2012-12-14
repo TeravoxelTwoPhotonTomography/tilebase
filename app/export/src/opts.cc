@@ -303,6 +303,8 @@ unsigned parse_args(int argc, char *argv[])
            "  128k\n"
            "  0.5G\n"
            )
+      ("fov_x_um",value<double>(&OPTS.fov_x_um)->default_value(-1.0),"If positive, override the size of the field of view for each tile along the x direction.")
+      ("fov_y_um",value<double>(&OPTS.fov_x_um)->default_value(-1.0),"If positive, override the size of the field of view for each tile along the y direction.")
       ;
 
     cmdline_options.add(file_opts)

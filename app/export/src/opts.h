@@ -27,6 +27,16 @@ typedef struct _opts_t
 
   unsigned  flag_print_addresses;
   unsigned  flag_raveler_output;
+
+  double    fov_x_um; // if <0 use value from tile database, otherwise force fov size on tiles.
+  double    fov_y_um;
+
+#if 0  // TODO
+  unsigned  flag_adjust_contrast;
+  double    contrast_min;
+  double    contrast_max;
+#endif
+
   address_t target; // if not NULL, will try to render target from it's children.
   int gpu_id;
 } opts_t;

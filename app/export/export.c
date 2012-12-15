@@ -9,6 +9,7 @@
 #include "src/render.h"
 #include "src/mkpath.h"
 #include "src/opts.h"
+#include "src/fixup.h"
 
 #ifdef _MSC_VER
 #define snprintf _snprintf
@@ -151,7 +152,7 @@ int main(int argc, char* argv[])
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
-
+  TRY(fix_fov(tiles,OPTS.fov_x_um*1000.0,OPTS.fov_y_um*1000.0));
 
   if(OPTS.flag_raveler_output)
   { aabb_t bbox;

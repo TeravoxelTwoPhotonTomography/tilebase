@@ -155,7 +155,7 @@ float* TileTransform(tile_t self)
   { unsigned n;
     TRY(n=ndndim(TileShape(self)));
     NEW(float,self->transform,(n+1)*(n+1));
-    TRY(MetadataGetTransform(self->meta,self->transform));
+    TRY(MetadataGetTransform(TileMetadata(self),self->transform));
   }
   return self->transform;
 Error:

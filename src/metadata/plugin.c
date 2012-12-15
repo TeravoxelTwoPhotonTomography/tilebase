@@ -110,7 +110,7 @@ static metadata_api_t* load(const char *path, const char *fname)
   get_metadata_api_t get;
 #ifdef _MSC_VER
   TRY(SetDllDirectory(path),estring());
-  TRY(lib=LoadLibrary(fname),"There was a problem loading the specified library.");
+  SILENTTRY(lib=LoadLibrary(fname),"There was a problem loading the specified library.");
   SetDllDirectory(NULL); // reset
 #else
   { char *buf;
@@ -118,7 +118,7 @@ static metadata_api_t* load(const char *path, const char *fname)
     size_t n = strlen(path)+strlen(fname)+2; // one extra for the terminating null
     TRY(buf=(char*)alloca(n),"Out of stack space.");
     cat(buf,n,3,p);
-    TRY(lib=LoadLibrary(buf),"There was a problem loading the specified library.");
+    SILENTTRY(lib=LoadLibrary(buf),"There was a problem loading the specified library.");
   }
 #endif
   DBG("[TRY   ] %-20s fname: %s"ENDL,path,fname);

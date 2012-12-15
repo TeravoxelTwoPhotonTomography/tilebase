@@ -46,7 +46,10 @@ struct _tilebase_cache_t
   union _ctx
   { struct _reader
     { struct _seq 
-      { int64_t *b;
+      { union _b {
+          int64_t *i64;
+          double  *f64;
+        } b;
         size_t sz,cap;
       } seq;                  ///< resizeable, temporary storage for int64_t sequences.
       void *state;            ///< a 1 element stack for tracking parser state
@@ -79,7 +82,8 @@ struct _tilebase_cache_t
 #define LASTTILE (TILES->tiles[TILES->sz-1])
 #define SEQ_N    (self->ctx.reader.seq.sz)
 #define SEQ_CAP  (self->ctx.reader.seq.cap)
-#define SEQ      (self->ctx.reader.seq.b)
+#define SEQI     (self->ctx.reader.seq.b.i64)
+#define SEQF     (self->ctx.reader.seq.b.f64)
 
 #define KEY(key) (strcmp((char*)EVENT->data.scalar.value,key)==0)
 
@@ -92,6 +96,11 @@ struct _tilebase_cache_t
 #define SCALAR(str)    TRY(yaml_scalar_event_initialize(EVENT,0,0,(yaml_char_t*)str,strlen(str),1,1,YAML_ANY_SCALAR_STYLE))
 
 // HELPERS
+
+/** Returns the number of elements in an affine transform for an
+ *  \a n-dimensional vector.
+ */
+static size_t ntransform(size_t n) { return (n+1)*(n+1); }
 
 /** Find first difference between full-path and the root-path stored in the
     tilebase cache context.
@@ -191,15 +200,18 @@ static void* tile(tilebase_cache_t self);
 static void* shape(tilebase_cache_t self);
 static void* aabb(tilebase_cache_t self);
 static void* sequence_of_ints(tilebase_cache_t self);
+static void* sequence_of_floats(tilebase_cache_t self);
 // sequence handlers - forward declared
 static void  ori(tilebase_cache_t self);
 static void  box(tilebase_cache_t self);
 static void  dims(tilebase_cache_t self);
+static void  transform(tilebase_cache_t self);
 // state stack manipulation
 static void* pop(tilebase_cache_t self);
 static void  push(tilebase_cache_t self, void *f, void *callback);
 // resizable integer sequence buffer
-static int   append(tilebase_cache_t self, const char* str);
+static int   append_i64(tilebase_cache_t self, const char* str);
+static int   append_f64(tilebase_cache_t self, const char* str);
 static void  clear(tilebase_cache_t self);
 static void  release(tilebase_cache_t self);
 
@@ -214,13 +226,26 @@ void* pop(tilebase_cache_t self)
     self->ctx.reader.callback(self);  
   return (self->log)?0:f;
 }
-int append (tilebase_cache_t self, const char* str)
+int append_i64 (tilebase_cache_t self, const char* str)
 { if(SEQ_N>=SEQ_CAP)
   { SEQ_CAP=SEQ_CAP*1.2+50;
-    RESIZE(int64_t,SEQ,SEQ_CAP);
+    RESIZE(int64_t,SEQI,SEQ_CAP);
   }
   errno=0;
-  SEQ[SEQ_N++]=strtol(str,NULL,10);
+  SEQI[SEQ_N++]=strtol(str,NULL,10);
+  TRY(!errno);
+  return 1;
+Error:
+  REPORT(errno,strerror(errno));
+  return 0;
+}
+int append_f64 (tilebase_cache_t self, const char* str)
+{ if(SEQ_N>=SEQ_CAP)
+  { SEQ_CAP=SEQ_CAP*1.2+50;
+    RESIZE(double,SEQF,SEQ_CAP);
+  }
+  errno=0;
+  SEQF[SEQ_N++]=strtod(str,NULL);
   TRY(!errno);
   return 1;
 Error:
@@ -228,31 +253,49 @@ Error:
   return 0;
 }
 void clear(tilebase_cache_t self)       {SEQ_N=0;}
-void release(tilebase_cache_t self)     {if(SEQ) free(SEQ);}
+void release(tilebase_cache_t self)     {if(SEQI) free(SEQI);}
 void *sequence_of_ints(tilebase_cache_t self)
 { char *e;
   switch(E_TYPE)
   { case YAML_SEQUENCE_START_EVENT: clear(self); return sequence_of_ints;
     case YAML_SEQUENCE_END_EVENT: return pop(self);
-    case YAML_SCALAR_EVENT: TRY(append(self,E_VAL)); return sequence_of_ints;
+    case YAML_SCALAR_EVENT: TRY(append_i64(self,E_VAL)); return sequence_of_ints;
+    default:;
+  }
+Error:
+  return 0;
+}
+void *sequence_of_floats(tilebase_cache_t self)
+{ char *e;
+  switch(E_TYPE)
+  { case YAML_SEQUENCE_START_EVENT: clear(self); return sequence_of_floats;
+    case YAML_SEQUENCE_END_EVENT: return pop(self);
+    case YAML_SCALAR_EVENT: TRY(append_f64(self,E_VAL)); return sequence_of_floats;
     default:;
   }
 Error:
   return 0;
 }
 void ori(tilebase_cache_t self)
-{ TRY(AABBSet(LASTTILE->aabb,SEQ_N,SEQ,0));
+{ TRY(AABBSet(LASTTILE->aabb,SEQ_N,SEQI,0));
   Error:;// pass
 }
 void aabb_shape(tilebase_cache_t self)
-{ TRY(AABBSet(LASTTILE->aabb,SEQ_N,0,SEQ));
+{ TRY(AABBSet(LASTTILE->aabb,SEQ_N,0,SEQI));
   Error:;// pass
 }
 void dims(tilebase_cache_t self)
 { size_t i;
   for(i=0;i<SEQ_N;++i)
-    TRY(ndShapeSet(LASTTILE->shape,i,(size_t)SEQ[i]));
+    TRY(ndShapeSet(LASTTILE->shape,i,(size_t)SEQI[i]));
   Error:;// pass
+}
+void transform(tilebase_cache_t self)
+{ size_t i;
+  RESIZE(float,LASTTILE->transform,SEQ_N);
+  for(i=0;i<SEQ_N;++i)
+    LASTTILE->transform[i]=(float)SEQF[i];
+  Error:; //pass
 }
 
 void* aabb(tilebase_cache_t self)
@@ -311,6 +354,10 @@ void* tile(tilebase_cache_t self)
       }
       else if(KEY("aabb")) { return aabb;}
       else if(KEY("shape")){ return shape;}
+      else if(KEY("transform"))
+      { push(self,tile,transform);
+        return sequence_of_floats;
+      }
       printf("Unrecognized: %s\n",E_VAL);
     default:;
   }
@@ -379,6 +426,19 @@ Error:
   return 0;
 }
 
+unsigned emit_seq_f32(tilebase_cache_t self, size_t n, float *s)
+{ size_t i;
+  char buf[1024];
+  SEQ_START_FLOW; EMIT;
+  for(i=0;i<n;++i)
+  { snprintf(buf,sizeof(buf),"%f",(float)s[i]);
+    SCALAR(buf); EMIT;
+  }
+  SEQ_END; EMIT;
+  return 1;
+Error:
+  return 0;
+}
 //
 // === INTERFACE ===
 //
@@ -425,7 +485,7 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   }
   return self;
 Error:
-  LOG("\tpath: %s"ENDL "\tmode: %s"ENDL, path?path:"(none)",mode?mode:"(none)");
+  LOG("\tpath: %s"ENDL "\tmode: %s"ENDL,fpath[0]?fpath:"(none)",mode?mode:"(none)");
   TileBaseCacheClose(self);
   return 0;
 }
@@ -490,6 +550,7 @@ Error:
   return 0;
 } 
 
+
 tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path, tile_t t)
 { size_t ndim;
   int64_t *ori,*shape;
@@ -518,6 +579,8 @@ tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path, til
       SCALAR("dims"); EMIT;
       emit_seq_sz(self,ndndim(TileShape(t)),dims);
     MAP_END; EMIT;
+    SCALAR("transform"); EMIT;
+    emit_seq_f32(self,ntransform(ndndim(TileShape(t))),TileTransform(t));
   MAP_END; EMIT;
 
   return self;

@@ -23,7 +23,9 @@ int main(int argc, char *argv[])
 { char *fmt;
   size_t count=0;
   if(argc<2)
-      printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));
+  { printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));
+    return 0;
+  }
   fmt=(argc==3)?argv[2]:0;
   TileBaseClose(TileBaseOpenWithProgressIndicator(argv[1],fmt,progress,(void*)&count));
   printf("\nCached %llu tiles\n",(unsigned long long)count);

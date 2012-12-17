@@ -19,7 +19,7 @@ var njobs=0;
 function job(path,args,callback)
 { 
   var hold = function (holds) { return ((args&&args.length)?(' -hold_jid '+args):' ') } 
-  console.log('DO '+path+'\tHOLD '+hold(args)+'\t -->  '+jobid);
+  console.log('DO '+path+'\tHOLD '+hold(args));
   var thing=('-terse -V -N clackn-tilebase-cache -o /dev/null -j y -b y -l short=true -cwd'+hold(args)).trim().split(' ');
   thing.push(cmd+' '+path);
   //console.log(thing);

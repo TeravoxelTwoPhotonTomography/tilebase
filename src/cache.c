@@ -374,8 +374,11 @@ void* root(tilebase_cache_t self)
     case YAML_SCALAR_EVENT: // consume key, consume+parse value, consume key
       yaml_event_delete(EVENT);
       TRY(yaml_parser_parse(PARSER,EVENT)); // consume key without checking it.. should be "path"
-      //printf("\t%s: %s\n","Root path",E_VAL);
-      memcpy(ROOT,E_VAL,strlen(E_VAL));
+      { char *rpath[PATH_MAX]={0};
+        TRY(realpath(E_VAL,rpath));
+      //printf("\t%s: %s\n","Root path",rpath);
+        memcpy(ROOT,rpath,strlen(rpath));
+      }
       yaml_event_delete(EVENT);
       TRY(yaml_parser_parse(PARSER,EVENT)); // consume key without checking it.. should be "tiles"
       return root;

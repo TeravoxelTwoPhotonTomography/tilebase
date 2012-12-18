@@ -5,6 +5,11 @@
 #define LOG(...) fprintf(stderr,__VA_ARGS__) 
 #define TRY(e)   do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
+/** \returns -1 if v is negative, 1 if v is possitive, otherwise 0.
+ *  Note that below, don't need to worry about "near 0" cases.
+ */
+static int sign(float v) { return (0.0f<v)-(v<0.0f); }
+
 /** \param[in] tiles  Tile database will be modified so all tiles have the new field of view.
  *  \param[in] x_nm   Width of a tile in nanometers.   Will be ignored if negative.
  *  \param[in] y_nm   Height of a tile in nanometers.  Will be ignored if negative. 
@@ -37,11 +42,11 @@ int fix_fov(tiles_t tiles, int64_t x_nm, int64_t y_nm)
       // But this is a fix-up function.  It's not intended to be general.
 
       if(x_nm>0)
-      { transform[0]*=(x_nm/(float)ndshape(shape_px)[0])/transform[0];
+      { transform[0]=sign(transform[0])*(x_nm/(float)ndshape(shape_px)[0]);
         shape_nm[0]=x_nm;
       }
       if(y_nm>0) 
-      { transform[(td+2)]*=(y_nm/(float)ndshape(shape_px)[1])/transform[(td+2)]; 
+      { transform[td+2]=sign(transform[td+2])*(y_nm/(float)ndshape(shape_px)[1]);
         shape_nm[1]=y_nm;
       }
     }
@@ -50,3 +55,4 @@ int fix_fov(tiles_t tiles, int64_t x_nm, int64_t y_nm)
 Error:
   return 0;
 }
+

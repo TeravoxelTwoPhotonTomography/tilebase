@@ -168,7 +168,7 @@ Error:
 
 static int maybe_resize(tiles_t self,size_t nelem)
 { if(nelem>self->cap)
-    self->cap=self->cap*1.2+50;
+    self->cap=nelem*1.2+50;
   TRY(self->tiles=realloc(self->tiles,self->cap*sizeof(tile_t)));
   return 1;
 Error:
@@ -246,9 +246,9 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format, til
         TileBaseCacheWrite(tiles->cache,local->tiles[i]->path,local->tiles[i]);
       }
       push_many(tiles,local);
+      TileBaseClose(local);
       return 1;
     }
-    TileBaseClose(local);
   }
 
   // No cache, process the directory

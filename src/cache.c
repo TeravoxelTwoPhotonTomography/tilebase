@@ -14,6 +14,9 @@
 #include <stdio.h>
 #include <stdint.h> 
 
+#include <limits.h> // for PATH_MAX (for realpath)
+#include <stdlib.h> // for realpath()
+
 #ifdef _MSC_VER
  #define vscprintf(fmt,args) _vscprintf(fmt,args)
  #define PATHSEP "\\"
@@ -449,7 +452,7 @@ Error:
  */
 tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
 { tilebase_cache_t self;
-  char fpath[1024]={0};
+  char fpath[1024]={0},rpath[PATH_MAX]={0};
   const char fname[]="tilebase.cache.yml";
 
   NEW(struct _tilebase_cache_t,self,1);
@@ -457,6 +460,8 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   strncpy(fpath,path,sizeof(fpath)-1);
   strncat(fpath,PATHSEP,sizeof(fpath)-strlen(fpath)-1);
   strncat(fpath,fname,sizeof(fpath)-strlen(fpath)-1);
+
+  TRY(realpath(path,rpath));
 
   TRY(FP=fopen(fpath,mode));
   switch(mode[0])
@@ -471,13 +476,13 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
       yaml_emitter_set_output_file(EMITTER,FP);
       yaml_stream_start_event_initialize(EVENT, YAML_UTF8_ENCODING);
       EMIT;
-      TRY(strlen(path)<sizeof(ROOT));
-      memcpy(ROOT,path,strlen(path));
+      TRY(strlen(rpath)<sizeof(ROOT));
+      memcpy(ROOT,rpath,strlen(rpath));
       TRY(yaml_document_start_event_initialize(EVENT,NULL,NULL,NULL,0));
       EMIT;
       MAP_START;       EMIT;
       SCALAR("path");  EMIT;
-      SCALAR(path);    EMIT;
+      SCALAR(rpath);   EMIT;
       SCALAR("tiles"); EMIT;
       SEQ_START;       EMIT;
       break;

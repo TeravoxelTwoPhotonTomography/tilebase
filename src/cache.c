@@ -100,6 +100,29 @@ struct _tilebase_cache_t
 
 // HELPERS
 
+
+#ifdef _MSC_VER
+#include <windows.h>
+#undef  LOG
+#define LOG(...) fprintf(stderr,__VA_ARGS__)
+/** Stand-in for realpath() for windows that uses GetFullPathName().
+ *  Only conforms to how realpath is used here.  Does not conform to POSIX.
+ */
+char *realpath(const char* path,char *out)
+{ int n=0;
+  TRY(n=GetFullPathName(path,out?strlen(out):0,out,NULL));
+  if(!out)
+  { NEW(char,out,n);
+    ZERO(char,out,n);
+    TRY(GetFullPathName(path,n,out,NULL));
+  }
+  return out;
+Error:
+  return 0;
+}
+#define LOG(...) tblog(self,__VA_ARGS__) // restor the normal logger
+#endif
+
 /** Returns the number of elements in an affine transform for an
  *  \a n-dimensional vector.
  */
@@ -374,10 +397,11 @@ void* root(tilebase_cache_t self)
     case YAML_SCALAR_EVENT: // consume key, consume+parse value, consume key
       yaml_event_delete(EVENT);
       TRY(yaml_parser_parse(PARSER,EVENT)); // consume key without checking it.. should be "path"
-      { char *rpath[PATH_MAX]={0};
-        TRY(realpath(E_VAL,rpath));
+      { char *rpath=0;
+        TRY(rpath=realpath(E_VAL,NULL));
       //printf("\t%s: %s\n","Root path",rpath);
         memcpy(ROOT,rpath,strlen(rpath));
+        free(rpath);
       }
       yaml_event_delete(EVENT);
       TRY(yaml_parser_parse(PARSER,EVENT)); // consume key without checking it.. should be "tiles"
@@ -455,7 +479,7 @@ Error:
  */
 tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
 { tilebase_cache_t self;
-  char fpath[1024]={0},rpath[PATH_MAX]={0};
+  char fpath[1024]={0},*rpath=0;
   const char fname[]="tilebase.cache.yml";
 
   NEW(struct _tilebase_cache_t,self,1);
@@ -464,7 +488,7 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   strncat(fpath,PATHSEP,sizeof(fpath)-strlen(fpath)-1);
   strncat(fpath,fname,sizeof(fpath)-strlen(fpath)-1);
 
-  TRY(realpath(path,rpath));
+  TRY(rpath=realpath(path,NULL));
 
   TRY(FP=fopen(fpath,mode));
   switch(mode[0])
@@ -491,8 +515,10 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
       break;
     default: FAIL("Unrecognized mode.");
   }
+  if(rpath) free(rpath);
   return self;
 Error:
+  if(rpath) free(rpath);
   LOG("\tpath: %s"ENDL "\tmode: %s"ENDL,fpath[0]?fpath:"(none)",mode?mode:"(none)");
   TileBaseCacheClose(self);
   return 0;

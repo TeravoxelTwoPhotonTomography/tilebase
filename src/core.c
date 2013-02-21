@@ -51,12 +51,13 @@ static void breakme() {};
 
 #ifdef _MSC_VER
 #include <windows.h>
+#define PATH_MAX (MAX_PATH)
 /** Stand-in for realpath() for windows that uses GetFullPathName().
  *  Only conforms to how realpath is used here.  Does not conform to POSIX.
  */
 static char *realpath(const char* path,char *out)
 { int n=0;
-  TRY(n=GetFullPathName(path,out?strlen(out):0,out,NULL));
+  TRY(n=GetFullPathName(path,out?MAX_PATH:0,out,NULL));
   if(!out)
   { NEW(char,out,n);
     ZERO(char,out,n);

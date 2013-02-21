@@ -25,6 +25,9 @@
 #include "cache.h"
 #include "core.priv.h" // defines tile_t and tiles_t structs
 
+#include <limits.h> // for PATH_MAX (for realpath)
+#include <stdlib.h> // for realpath()
+
 #ifdef _MSC_VER
 #include "util/dirent.win.h"
 #define PATHSEP '\\'
@@ -45,6 +48,25 @@
 
 static void breakme() {};
 /// @endcond
+
+#ifdef _MSC_VER
+#include <windows.h>
+/** Stand-in for realpath() for windows that uses GetFullPathName().
+ *  Only conforms to how realpath is used here.  Does not conform to POSIX.
+ */
+static char *realpath(const char* path,char *out)
+{ int n=0;
+  TRY(n=GetFullPathName(path,out?strlen(out):0,out,NULL));
+  if(!out)
+  { NEW(char,out,n);
+    ZERO(char,out,n);
+    TRY(GetFullPathName(path,n,out,NULL));
+  }
+  return out;
+Error:
+  return 0;
+}
+#endif
 
 //
 // === TILE API ===
@@ -300,9 +322,11 @@ tiles_t TileBaseOpen(const char* path, const char* format)
  *                     Otherwise this is left alone.  Use this to pass state
  *                     to/from the callback 
  */
-tiles_t TileBaseOpenWithProgressIndicator(const char *path, const char* format, tilebase_progress_t callback, void *cbdata)
+tiles_t TileBaseOpenWithProgressIndicator(const char *path_, const char* format, tilebase_progress_t callback, void *cbdata)
 { tiles_t out=0;
   tilebase_cache_t cache=0;
+  char path[PATH_MAX+1]={0};
+  TRY(realpath(path_,path));// canonicalize input path
   if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out) && out && out->sz>0)
   { TileBaseCacheClose(cache);
   } else

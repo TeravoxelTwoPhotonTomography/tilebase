@@ -108,7 +108,7 @@ struct _tilebase_cache_t
 /** Stand-in for realpath() for windows that uses GetFullPathName().
  *  Only conforms to how realpath is used here.  Does not conform to POSIX.
  */
-char *realpath(const char* path,char *out)
+static char *realpath(const char* path,char *out)
 { int n=0;
   TRY(n=GetFullPathName(path,out?strlen(out):0,out,NULL));
   if(!out)
@@ -120,6 +120,7 @@ char *realpath(const char* path,char *out)
 Error:
   return 0;
 }
+
 #define LOG(...) tblog(self,__VA_ARGS__) // restor the normal logger
 #endif
 
@@ -585,12 +586,14 @@ Error:
 } 
 
 
-tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path, tile_t t)
+tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path_, tile_t t)
 { size_t ndim;
   int64_t *ori,*shape;
   nd_type_id_t tid;
   size_t *dims;
+  char path[PATH_MAX+1]={0};
   TRY(self);
+  TRY(realpath(path_,path));// canonicalize input path
   // assert all the attributes we need to read exist.
   TRY(AABBGet(TileAABB(t),&ndim,&ori,&shape));
   tid=ndtype(TileShape(t));

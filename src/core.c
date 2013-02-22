@@ -246,6 +246,25 @@ Error:
 
 }
 
+/** dirent.d_type is not as cross platform as all that.
+    Uses stat instead.
+*/
+#include <sys/stat.h>
+static int isdir(const char *path, struct dirent *ent, int *isok)
+{ char full[PATH_MAX]={0};  
+  struct stat s;
+  strcat(full,path);
+  strcat(full,"/");
+  strcat(full,ent->d_name);
+  if(isok) *isok=0;
+  TRY(0==stat(full,&s));
+  if(isok) *isok=1;
+  return S_ISDIR(s.st_mode);
+Error:
+  perror("isdir()");
+  return 0;  
+}
+
 /**
  * Recursively descend path looking for tiles.
  *
@@ -277,13 +296,15 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format, til
   // No cache, process the directory
   TRY(dir=opendir(path));
   while((ent=readdir(dir)))
-  { if(ent->d_type==DT_DIR)
-    { if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
+  { int isok=1;
+    if(ent->d_name[0]!='.') //ignore "dot" hidden files and directories (including '.' and '..')
+    { if(isdir(path,ent,&isok)) 
       { any=1; // has a subdirectory ==> not a leaf
         if(!addtiles(tiles,join(next,sizeof(next),path,ent->d_name),format,callback,cbdata)) // maybe add subdirs -- some subdirs might not be valid
           continue;
       }
     }
+    TRY(isok);
   }
   
   if(!any) // then it's a leaf

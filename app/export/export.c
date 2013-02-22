@@ -159,7 +159,7 @@ int main(int argc, char* argv[])
     int64_t *shape=0,s;
     uint64_t v;
     double   f;
-    on_ready=save_raveler;
+    on_ready=save; //save_raveler;
     DBG("--- BEFORE\n");
     TRY(bbox=AdjustTilesBoundingBox(tiles,&OPTS.ox,&OPTS.lx));
     TRY(AABBGet(bbox,0,0,&shape));

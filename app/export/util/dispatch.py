@@ -26,7 +26,7 @@ def ifthen(predicate,a,b):
 GROUP_COMMAND=lambda addresses:["python",__file__]+sys.argv[1:]+['--target-group']+addresses
 def QSUB_COMMAND(addresses,holds):
   holdopt=lambda holds: ifthen(holds,['-hold_jid',','.join(map(str,holds))],[])
-  return 'qsub -terse -V -N clackn-mousebrain-export -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
+  return 'qsub -terse -V -N clackn-mousebrain-export -o /dev/null -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
 def NODE_COMMAND(index,address):
   rootcmd=sys.argv[1:sys.argv.index('--target-group')]
   return rootcmd+['--target-address',address,'--gpu',str(index)]

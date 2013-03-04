@@ -410,7 +410,7 @@ unsigned pbufv2_get_transform(metadata_t self, float *transform)
 
   { MatrixXf center(n+1,n+1),stage(n+1,n+1),S(n+1,n+1),R(n+1,n+1),F(n+1,n+1);
 
-    F.setIdentity().block<3,3>(0,0).diagonal() << 1.0f,-1.0f,1.0f;
+    F.setIdentity().block<3,3>(0,0).diagonal() << -1.0f,-1.0f,1.0f;
     R.setIdentity().block<3,3>(0,0)=AngleAxisf(ctx->scope.fov().rotation_radians(),Vector3f(0,0,1)).matrix();
     center.setIdentity().block<3,1>(0,n)
         << (-(float)ndshape(vol)[0]/2.0f),
@@ -422,7 +422,7 @@ unsigned pbufv2_get_transform(metadata_t self, float *transform)
            (float)ori[2];
     S.setIdentity().block<3,3>(0,0).diagonal()
         <<  shape[0]/(float)ndshape(vol)[0],
-            shape[1]/(float)ndshape(vol)[1], // flip y
+            shape[1]/(float)ndshape(vol)[1],
             shape[2]/(float)ndshape(vol)[2];
 
     Map<Matrix<float,Dynamic,Dynamic,RowMajor> > M(transform,n+1,n+1);

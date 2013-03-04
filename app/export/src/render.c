@@ -151,6 +151,28 @@ static void affine_workspace__init(affine_workspace *ws)
   ws->params.boundary_value=0x8000; // MIN_I16 - TODO: hardcoded here...should be an option
 };
 
+static double boundary_value(nd_t vol)
+{
+  switch(ndtype(vol))
+  { 
+    case nd_u8:
+    case nd_u16:
+    case nd_u32:
+    case nd_u64:
+    case nd_f32:
+    case nd_f64: return 0; break;
+    case nd_i8:  return 0x80; break; 
+    case nd_i16: return 0x8000; break;
+    case nd_i32: return 0x80000000; break; 
+    case nd_i64: return 0x8000000000000000LL; break; 
+    default: return 0;
+  }
+}
+
+static void affine_workspace__set_boundary_value(affine_workspace* ws,nd_t vol)
+{ ws->params.boundary_value=boundary_value(vol);
+}
+
 static desc_t make_desc(tiles_t tiles, double voxel_um[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
 { const float um2nm=1e3;
 
@@ -419,6 +441,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
       n=ndndim(in);
       NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
       TRY(set_ref_shape(desc,in));
+       affine_workspace__set_boundary_value(&desc->aws,in);
     } 
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
     { nd_t s=TileShape(tiles[i]);
@@ -542,6 +565,7 @@ static nd_t target__load(desc_t *desc, aabb_t bbox, address_t path)
   { n=ndndim(out);
     NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
     TRY(set_ref_shape(desc,out));
+    affine_workspace__set_boundary_value(&desc->aws,out);
   }
   return out;
 Error:

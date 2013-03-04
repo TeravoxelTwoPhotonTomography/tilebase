@@ -35,7 +35,7 @@ using namespace Eigen;
 using namespace std;
 
 /// @cond DEFINES
-#define PBUFV1_FORMAT_NAME "fetch.protobuf.v1"
+#define PBUFV2_FORMAT_NAME "fetch.protobuf.v2"
 
 //#define DEBUG // if defined, turns on debug output
 
@@ -59,9 +59,9 @@ using namespace std;
 #endif
 /// @endcond
 
-typedef fetch::cfg::device::MicroscopeV1 scope_desc_t;
-typedef fetch::cfg::data::Acquisition   stack_desc_t;
-typedef google::protobuf::Message       desc_t;
+typedef fetch::cfg::device::MicroscopeV2 scope_desc_t;
+typedef fetch::cfg::data::Acquisition  stack_desc_t;
+typedef google::protobuf::Message      desc_t;
 
 //
 // GLOBALS
@@ -83,14 +83,14 @@ static const char* normalize_extension(const char *ext)
 { return (ext[0]=='.')?(ext+1):ext;
 }
 
-struct pbufv1_t
+struct pbufv2_t
 { scope_desc_t  scope;
   stack_desc_t  stack;
   unsigned      read_mode,
                 write_mode;
   std::string   path;
   
-  pbufv1_t(const char* _path):read_mode(0),write_mode(0),path(_path) 
+  pbufv2_t(const char* _path):read_mode(0),write_mode(0),path(_path) 
   { // clean path of the trailing path seperator if it's there
     char e= *path.rbegin();
     if(e=='/') // assume unix-style path seperators
@@ -216,7 +216,7 @@ Error:
  * Finds the first file with extension \a ext in \a path.  If
  * none is found, a default name is generated.
  *
- * \see pbufv1_close()
+ * \see pbufv2_close()
  * \param[out]    out             Output buffer.
  * \param[in]     path            Path to destination directory.
  * \param[in]     ext             The file extension to search for.
@@ -264,13 +264,13 @@ Error:
 // INTERFACE
 //
 
-const char* pbufv1_name()
-{ return PBUFV1_FORMAT_NAME; }
+const char* pbufv2_name()
+{ return PBUFV2_FORMAT_NAME; }
 
 /**
  * Just checks for the existence of the expected files at \a path.
  */
-unsigned pbufv1_is_fmt(const char* path, const char* mode)
+unsigned pbufv2_is_fmt(const char* path, const char* mode)
 { char name[1024];
   scope_desc_t desc;
   unsigned v;
@@ -283,8 +283,8 @@ unsigned pbufv1_is_fmt(const char* path, const char* mode)
 }
 
 /** Valid modes: "r", "w", "rw" */
-void* pbufv1_open(const char* path, const char* mode)
-{ pbufv1_t *ctx=new pbufv1_t(path);
+void* pbufv2_open(const char* path, const char* mode)
+{ pbufv2_t *ctx=new pbufv2_t(path);
   TRY(parse_mode_string((char*)mode,&ctx->read_mode,&ctx->write_mode));
   if(ctx->read_mode)
   { TRY(readDescFromPath(path,".microscope",&ctx->scope));
@@ -297,8 +297,8 @@ Error:
 }
 
 /** Commit any changes if opened with write mode. */
-void pbufv1_close(metadata_t self)
-{ pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
+void pbufv2_close(metadata_t self)
+{ pbufv2_t *ctx=(pbufv2_t*)MetadataContext(self);
   if(ctx->write_mode)
   { WARN(write(ctx->scope,ctx->path.c_str(),".microscope" ,"default"));
     WARN(write(ctx->stack,ctx->path.c_str(),".acquisition","default"));  
@@ -312,8 +312,8 @@ void pbufv1_close(metadata_t self)
  * This function is called via MetadataGetOrigin(), which ensures
  * \a self and \a nelem are not NULL.
  */
-unsigned pbufv1_origin(metadata_t self, size_t *nelem, int64_t* origin)
-{ pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
+unsigned pbufv2_origin(metadata_t self, size_t *nelem, int64_t* origin)
+{ pbufv2_t *ctx=(pbufv2_t*)MetadataContext(self);
   static const int64_t mm2nm = 1e6;
   if(nelem) *nelem=3;
   if(!origin) //just set nelem and return
@@ -324,8 +324,8 @@ unsigned pbufv1_origin(metadata_t self, size_t *nelem, int64_t* origin)
   return 1;
 }
 
-unsigned pbufv1_set_origin(metadata_t self_, size_t nelem, int64_t* origin)
-{ pbufv1_t *self=(pbufv1_t*)MetadataContext(self_);
+unsigned pbufv2_set_origin(metadata_t self_, size_t nelem, int64_t* origin)
+{ pbufv2_t *self=(pbufv2_t*)MetadataContext(self_);
   double nm2mm=1e-6;
   TRY(nelem==3);
   self->stack.set_x_mm(origin[0]*nm2mm);
@@ -336,8 +336,8 @@ Error:
   return 0;
 }
 
-unsigned pbufv1_set_shape (metadata_t self_, size_t nelem, int64_t* shape)
-{ pbufv1_t *self=(pbufv1_t*)MetadataContext(self_);
+unsigned pbufv2_set_shape (metadata_t self_, size_t nelem, int64_t* shape)
+{ pbufv2_t *self=(pbufv2_t*)MetadataContext(self_);
   double nm2um=1e-3;
   TRY(nelem==3);
   self->scope.mutable_fov()->set_x_size_um(shape[0]*nm2um);
@@ -348,8 +348,8 @@ Error:
   return 0;
 }
 
-unsigned pbufv1_shape(metadata_t self, size_t *nelem, int64_t* shape)
-{ pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
+unsigned pbufv2_shape(metadata_t self, size_t *nelem, int64_t* shape)
+{ pbufv2_t *ctx=(pbufv2_t*)MetadataContext(self);
   static const int64_t um2nm = 1e3;
   if(nelem) *nelem=3;
   if(!shape) //just set nelem and return
@@ -360,8 +360,8 @@ unsigned pbufv1_shape(metadata_t self, size_t *nelem, int64_t* shape)
   return 1;
 }
 
-ndio_t pbufv1_get_vol(metadata_t self, const char* mode)
-{ pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
+ndio_t pbufv2_get_vol(metadata_t self, const char* mode)
+{ pbufv2_t *ctx=(pbufv2_t*)MetadataContext(self);
   return ndioOpen(ctx->get_vol_path().c_str(),"series",mode);
 }
 
@@ -392,21 +392,21 @@ ndio_t pbufv1_get_vol(metadata_t self, const char* mode)
 // { matrix[idim*(ndim+1)+ndim]=s;
 // }
 
-unsigned pbufv1_get_transform(metadata_t self, float *transform)
-{ pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
+unsigned pbufv2_get_transform(metadata_t self, float *transform)
+{ pbufv2_t *ctx=(pbufv2_t*)MetadataContext(self);
 #if 1
   nd_t vol;  
   unsigned i,n;
   int64_t shape[3],ori[3];
 
   ndio_t file;
-  TRY(file=pbufv1_get_vol(self,"r"));
+  TRY(file=pbufv2_get_vol(self,"r"));
   vol=ndioShape(file);
   ndioClose(file);
 
   TRY((n=ndndim(vol))==3 || n==4); // 3d or 3d+1 color dimension
-  TRY(pbufv1_shape(self,NULL,shape));
-  TRY(pbufv1_origin(self,NULL,ori));
+  TRY(pbufv2_shape(self,NULL,shape));
+  TRY(pbufv2_origin(self,NULL,ori));
 
   { MatrixXf center(n+1,n+1),stage(n+1,n+1),S(n+1,n+1),R(n+1,n+1),F(n+1,n+1);
 
@@ -466,16 +466,16 @@ Error:
 shared
 const metadata_api_t* get_metadata_api()
 { static const metadata_api_t api =
-  {   pbufv1_name,
-      pbufv1_is_fmt,
-      pbufv1_open,
-      pbufv1_close,
-      pbufv1_origin,
-      pbufv1_set_origin,
-      pbufv1_shape,
-      pbufv1_set_shape,
-      pbufv1_get_vol,
-      pbufv1_get_transform,
+  {   pbufv2_name,
+      pbufv2_is_fmt,
+      pbufv2_open,
+      pbufv2_close,
+      pbufv2_origin,
+      pbufv2_set_origin,
+      pbufv2_shape,
+      pbufv2_set_shape,
+      pbufv2_get_vol,
+      pbufv2_get_transform,
       ndioAddPlugin,
       NULL
   };

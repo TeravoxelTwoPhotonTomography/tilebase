@@ -16,12 +16,24 @@ endmacro()
 # CONFIG
 ################################################################################
 
+find_package(GTEST CONFIG PATHS cmake)
+
 set(TILEBASE_PLUGIN_PATH plugins)
+set(NDIO_PLUGIN_PATH     ${CMAKE_CURRENT_BINARY_DIR}/plugins)
 
 find_package(YAML CONFIG PATHS cmake)
 include_directories(${YAML_INCLUDE_DIRS})
 
-find_package(ND CONFIG PATHS cmake)
+find_package(ND COMPONENTS 
+  ndio-series
+  ndio-tiff
+  ndio-hdf5
+  ndio-ffmpeg
+  ndio-raw
+  #ndio-test-data
+  #ndio-jpeg
+  #ndio-png
+  CONFIG PATHS cmake)
 include_directories(${ND_INCLUDE_DIRS})
 
 set(TILEBASE_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
@@ -92,7 +104,6 @@ add_subdirectory(app/tilebase-cache-build)
 #  Testing
 ###############################################################################
 
-find_package(GTEST CONFIG PATHS cmake)
 file(GLOB TEST_SOURCES test/*.cc)
 if(GTEST_FOUND AND TEST_SOURCES)
   find_package(Threads)

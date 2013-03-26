@@ -12,6 +12,8 @@ set(PBUFV0_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
+find_package(GTEST CONFIG PATHS cmake)
+
 find_package(PROTOBUF CONFIG PATHS cmake)
 find_package(EIGEN CONFIG PATHS cmake)
 if(PROTOBUF_FOUND AND EIGEN_FOUND)
@@ -64,11 +66,12 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
     include_directories(${PROJECT_SOURCE_DIR})
     include_directories(${GTEST_INCLUDE_DIR})
     add_executable(test-meta-protobuf-v0 ${TEST_SOURCES} ${CFG})
+    show(GTEST_BOTH_LIBRARIES)
     target_link_libraries(test-meta-protobuf-v0
       ${GTEST_BOTH_LIBRARIES}
       ${CMAKE_THREAD_LIBS_INIT}
-      tilebase
       ${PROTOBUF_LIBRARY}
+      tilebase
       )
     add_dependencies(test-meta-protobuf-v0 gtest)
     gtest_copy_shared_libraries(test-meta-protobuf-v0)

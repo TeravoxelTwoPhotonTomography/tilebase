@@ -24,7 +24,7 @@ set(NDIO_PLUGIN_PATH     ${CMAKE_CURRENT_BINARY_DIR}/plugins)
 find_package(YAML CONFIG PATHS cmake)
 include_directories(${YAML_INCLUDE_DIRS})
 
-find_package(ND COMPONENTS 
+set(ND_PLUGINS 
   ndio-series
   ndio-tiff
   ndio-hdf5
@@ -33,7 +33,8 @@ find_package(ND COMPONENTS
   #ndio-test-data
   #ndio-jpeg
   #ndio-png
-  CONFIG PATHS cmake)
+)
+find_package(ND COMPONENTS ${ND_PLUGINS} CONFIG PATHS cmake)
 include_directories(${ND_INCLUDE_DIRS})
 
 set(TILEBASE_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
@@ -121,7 +122,7 @@ if(GTEST_FOUND AND TEST_SOURCES)
     gtest
     ${PLUGINS}
   )
-  nd_copy_plugins_to_target(test-tilebase)
+  nd_copy_plugins_to_target(test-tilebase ${ND_PLUGINS})
   gtest_copy_shared_libraries(test-tilebase)
   tilebase_copy_plugins_to_target(test-tilebase)
   add_test(TestTilebase test-tilebase)

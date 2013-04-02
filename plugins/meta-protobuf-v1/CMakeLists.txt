@@ -68,6 +68,9 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
       tilebase
       ${PROTOBUF_LIBRARY}
       )
+    set_target_properties(test-meta-protobuf-v1 PROPERTIES 
+      INSTALL_RPATH             ${RPATH}
+    )
     add_dependencies(test-meta-protobuf-v1 gtest)
     gtest_copy_shared_libraries(test-meta-protobuf-v1)
     add_test(TestMetadataProtobufV0 test-meta-protobuf-v1)

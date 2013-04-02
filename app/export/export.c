@@ -65,7 +65,7 @@ unsigned save(nd_t vol, address_t address, void* args)
   printf("SAVING %s"ENDL,full);
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
-  ndioClose(ndioWrite(ndioOpen(full,NULL,"w"),vol));
+  ndioClose(ndioWrite(ndioOpen(full,"series","w"),vol));
 Finalize:
   //ndfree(tmp);
   return isok;
@@ -97,7 +97,7 @@ unsigned save_raveler(nd_t vol, address_t address, void* args)
   printf("SAVING %s"ENDL,full);
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
-  ndioClose(ndioWrite(ndioOpen(full,NULL,"w"),tmp2));
+  ndioClose(ndioWrite(ndioOpen(full,"series","w"),tmp2));
 Finalize:
   ndfree(tmp);
   ndfree(tmp2);
@@ -119,7 +119,7 @@ nd_t load(address_t address)
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   printf("LOADING %s"ENDL,full);
 #if 1
-  TRY(f=ndioOpen(full,NULL,"r"));
+  TRY(f=ndioOpen(full,"series","r"));
   TRY(out=ndioShape(f));
   TRY(ndref(out,malloc(ndnbytes(out)),nd_heap));
   TRY(ndioRead(f,out));

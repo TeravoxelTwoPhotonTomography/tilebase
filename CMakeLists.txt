@@ -55,6 +55,12 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR})
 file(GLOB SRCS src/*.c src/*.cc src/metadata/*.c)
 file(GLOB HDRS src/*.h src/metadata/*.h src/util/*.h)
+# install public headers
+install(FILES 
+  src/core.h 
+  src/aabb.h 
+  src/cache.h 
+DESTINATION include)
 
 ################################################################################
 # TARGETS
@@ -160,4 +166,10 @@ install(TARGETS tilebase
 )
 export(TARGETS tilebase FILE tilebase-targets.cmake)
 install(EXPORT tilebase-targets DESTINATION cmake/)
+
+###############################################################################
+#  CPack  
+###############################################################################
+include(CPack)
+include(InstallRequiredSystemLibraries)
 

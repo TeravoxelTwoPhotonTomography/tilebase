@@ -62,6 +62,7 @@ foreach(package ${ND_FIND_COMPONENTS})
     set(ND_${package}_FOUND TRUE)
   endif()
   install(FILES ${plugin} DESTINATION bin/plugins)
+  install(FILES ${${package}-EXTRAS} DESTINATION bin/plugins)
 endforeach()
 
 ### Check everything got found

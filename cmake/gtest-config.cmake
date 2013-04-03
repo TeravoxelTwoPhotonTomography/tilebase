@@ -6,6 +6,7 @@ if(NOT GTEST_INCLUDE_DIR) #if this is set, assume gtest location has been overri
     # DOWNLOAD AND BUILD
     ExternalProject_Add(gtest
       SVN_REPOSITORY http://googletest.googlecode.com/svn/trunk/
+      UPDATE_COMMAND ""
       INSTALL_COMMAND "" #The gtest project  doesn't support install
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
                  -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
@@ -60,6 +61,7 @@ if(NOT GTEST_INCLUDE_DIR) #if this is set, assume gtest location has been overri
       set(loc_debug   ${loc})
       set(loc_release ${loc})
     endif()
+    install(FILES ${loc_release} DESTINATION bin CONFIGURATIONS)
     install(FILES ${loc_debug}   DESTINATION bin CONFIGURATIONS Debug)
     install(FILES ${loc_release} DESTINATION bin CONFIGURATIONS Release)
   endforeach()

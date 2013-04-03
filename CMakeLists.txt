@@ -16,6 +16,11 @@ endmacro()
 # CONFIG
 ################################################################################
 
+set(RPATH \$ORIGIN)
+if(APPLE)
+  set(RPATH @rpath)
+endif()
+
 find_package(GTEST CONFIG PATHS cmake)
 
 set(TILEBASE_PLUGIN_PATH plugins)
@@ -55,6 +60,12 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR})
 file(GLOB SRCS src/*.c src/*.cc src/metadata/*.c)
 file(GLOB HDRS src/*.h src/metadata/*.h src/util/*.h)
+# install public headers
+install(FILES 
+  src/core.h 
+  src/aabb.h 
+  src/cache.h 
+DESTINATION include/tilebase)
 
 ################################################################################
 # TARGETS
@@ -122,6 +133,9 @@ if(GTEST_FOUND AND TEST_SOURCES)
     gtest
     ${PLUGINS}
   )
+  set_target_properties(test-tilebase PROPERTIES 
+    INSTALL_RPATH             ${RPATH}
+  )
   nd_copy_plugins_to_target(test-tilebase ${ND_PLUGINS})
   gtest_copy_shared_libraries(test-tilebase)
   tilebase_copy_plugins_to_target(test-tilebase)
@@ -160,4 +174,10 @@ install(TARGETS tilebase
 )
 export(TARGETS tilebase FILE tilebase-targets.cmake)
 install(EXPORT tilebase-targets DESTINATION cmake/)
+
+###############################################################################
+#  CPack  
+###############################################################################
+include(CPack)
+include(InstallRequiredSystemLibraries)
 

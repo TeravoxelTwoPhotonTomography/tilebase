@@ -83,6 +83,12 @@ static const char* normalize_extension(const char *ext)
 { return (ext[0]=='.')?(ext+1):ext;
 }
 
+static size_t rfind_pathsep(const std::string& s)
+{ long i=s.rfind('\\'),
+       j=s.rfind('/');
+  return (i>j)?i:j;
+}
+
 struct pbufv1_t
 { scope_desc_t  scope;
   stack_desc_t  stack;
@@ -113,7 +119,7 @@ struct pbufv1_t
    */
   std::string get_vol_path()
   { //extract the series no. from the path
-    std::string ss=path.substr(path.rfind(PATHSEP));
+    std::string ss=path.substr(rfind_pathsep(path));
     const char *series=ss.c_str(),
                *prefix=scope.file_prefix().c_str(),
                *ext=normalize_extension(scope.stack_extension().c_str());

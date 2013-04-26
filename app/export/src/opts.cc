@@ -171,7 +171,7 @@ static void validate(any &v,const vector<string>& vals,HumanReadibleSize*,int)
   int i=-1;
   string s,suffixes(" kMGPTE");
   ss>>i>>s;
-  if(i<=0||suffixes.find(s[0])==suffixes.length())
+  if(i<=0||s.empty()||suffixes.find(s[0])==suffixes.length())
     throw validation_error(validation_error::invalid_option_value);
   v=any(HumanReadibleSize(o));
   return;

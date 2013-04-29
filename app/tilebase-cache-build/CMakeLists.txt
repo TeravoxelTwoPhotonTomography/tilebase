@@ -9,3 +9,5 @@ target_link_libraries(${_target}
 tilebase_copy_plugins_to_target(${_target})
 nd_copy_plugins_to_target(${_target} ${ND_PLUGINS})
 install(TARGETS ${_target} RUNTIME DESTINATION bin)
+
+install(DIRECTORY util/ DESTINATION scripts/tilebase-cache-build)

@@ -19,3 +19,5 @@ target_link_libraries(${_target}
 tilebase_copy_plugins_to_target(export)
 nd_copy_plugins_to_target(export ${ND_PLUGINS})
 install(TARGETS ${_target} RUNTIME DESTINATION bin)
+
+install(DIRECTORY util/ DESTINATION scripts/export)

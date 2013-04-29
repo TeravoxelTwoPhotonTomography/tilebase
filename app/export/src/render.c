@@ -11,7 +11,7 @@
 #include "xform.h"
 #include "address.h"
 #include <math.h> //for sqrt
-
+#include "cuda_runtime.h" // for cudaGetMemInfo
 #include "tictoc.h" // for profiling
 
 #ifdef _MSC_VER
@@ -383,7 +383,6 @@ Error:
   return 0;
 }
 
-#include "cuda_runtime.h"
 /**
  * Anti-aliasing filter. Uses seperable convolutions.
  * Uses double-buffering.  The two buffers are tracked by the filter_workspace.

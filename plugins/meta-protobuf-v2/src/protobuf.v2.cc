@@ -84,8 +84,10 @@ static const char* normalize_extension(const char *ext)
 }
 
 static std::string pop_path(std::string& p)
-{ size_t i=p.rfind('/'),
-         j=p.rfind('\\');
+{ size_t  i=p.rfind('/'),
+          j=p.rfind('\\');
+  i=(i==std::string::npos)?0:i;
+  j=(j==std::string::npos)?0:j;
   return p.substr((i<j)?j:i);
 }
 

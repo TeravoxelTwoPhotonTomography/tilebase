@@ -440,14 +440,21 @@ typedef struct _subdiv_t
   float *transform;
   nd_t   carray;
 } *subdiv_t;
-static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim)
+static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace)
 { subdiv_t ctx=0;
   size_t free,total,factor;
   TRY(ndndim(in)>3); // assume there's a z.
   NEW(struct _subdiv_t,ctx,1);
   ZERO(struct _subdiv_t,ctx,1);
-  cudaMemGetInfo(&free,&total);
-  ctx->n=(ndnbytes(in)*2+free)/free; /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
+#define CEIL(num,den) (((num)+(den)-1)/(den))
+  if(!workspace)
+  { cudaMemGetInfo(&free,&total);
+    ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
+  } else
+  { ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time 
+  } 
+#undef CEIL
+  TRY(ctx->n<ndshape(in)[2]);
   ctx->transform=transform;
   ctx->d=ndim;
   ctx->zmax =ndshape(in)[2];
@@ -521,7 +528,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
-    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in)));
+    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->fws.gpu[0]));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
       TIME(TRY(t=aafilt(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu

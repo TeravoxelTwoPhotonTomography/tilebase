@@ -33,7 +33,6 @@ void compose(float *restrict out,
              float *restrict transform, unsigned ndim)
 { 
   MatrixXf                         dst2world(ndim+1,ndim+1);
-//  Map<MatrixXf,Unaligned,Stride<1,Dynamic> > src2world(transform,ndim+1,ndim+1);
   Map<Matrix<float,Dynamic,Dynamic,RowMajor> > src2world(transform,ndim+1,ndim+1);
   Map<Matrix<float,Dynamic,Dynamic,RowMajor> > T(out,ndim+1,ndim+1);
 

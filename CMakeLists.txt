@@ -16,6 +16,11 @@ endmacro()
 # CONFIG
 ################################################################################
 
+set(RPATH \$ORIGIN)
+if(APPLE)
+  set(RPATH @rpath)
+endif()
+
 find_package(GTEST CONFIG PATHS cmake)
 
 set(TILEBASE_PLUGIN_PATH plugins)
@@ -60,7 +65,7 @@ install(FILES
   src/core.h 
   src/aabb.h 
   src/cache.h 
-DESTINATION include)
+DESTINATION include/tilebase)
 
 ################################################################################
 # TARGETS
@@ -127,6 +132,9 @@ if(GTEST_FOUND AND TEST_SOURCES)
   add_dependencies(test-tilebase
     gtest
     ${PLUGINS}
+  )
+  set_target_properties(test-tilebase PROPERTIES 
+    INSTALL_RPATH             ${RPATH}
   )
   nd_copy_plugins_to_target(test-tilebase ${ND_PLUGINS})
   gtest_copy_shared_libraries(test-tilebase)

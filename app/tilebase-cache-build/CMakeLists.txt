@@ -6,6 +6,7 @@ add_executable(${_target} tilebase-cache-build.c)
 target_link_libraries(${_target}
   tilebase
   )
+set_target_properties(${_target} PROPERTIES INSTALL_RPATH ${RPATH})
 tilebase_copy_plugins_to_target(${_target})
 nd_copy_plugins_to_target(${_target} ${ND_PLUGINS})
 install(TARGETS ${_target} RUNTIME DESTINATION bin)

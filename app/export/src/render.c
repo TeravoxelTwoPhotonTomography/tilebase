@@ -342,21 +342,30 @@ static unsigned same_shape(nd_t a, nd_t b)
 }
 
 static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
-{ if(!ws->gpu[0])
+{ 
+  { size_t free,total;
+    cudaMemGetInfo(&free,&total);
+    LOG("GPU Mem:\t%6.2f free\t%6.2f total\n",free/1e6,total/1e6);
+  }
+  
+  if(!ws->gpu[0])
   { TRY(ws->gpu[0]=NDCUDA(vol,0));
     TRY(ws->gpu[1]=NDCUDA(vol,0));
     ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
+#if 0 //don't need this because ndCudaSyncShape sets capacity if necessary
   if(ws->capacity<ndnbytes(vol))
   { TRY(ndCudaSetCapacity(ws->gpu[0],ndnbytes(vol)));
     TRY(ndCudaSetCapacity(ws->gpu[1],ndnbytes(vol)));
     ws->capacity=ndnbytes(vol);
   }
+#endif
   if(!same_shape(ws->gpu[0],vol))
   { ndreshape(ws->gpu[0],ndndim(vol),ndshape(vol));
     ndreshape(ws->gpu[1],ndndim(vol),ndshape(vol));
     ndCudaSyncShape(ws->gpu[0]); // the cuda transfer can get expensive so it's worth avoiding these calls
     ndCudaSyncShape(ws->gpu[1]);
+    ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
   return 1;
 Error:
@@ -374,6 +383,7 @@ Error:
   return 0;
 }
 
+#include "cuda_runtime.h"
 /**
  * Anti-aliasing filter. Uses seperable convolutions.
  * Uses double-buffering.  The two buffers are tracked by the filter_workspace.
@@ -421,13 +431,73 @@ static int any_tiles_in_box(tile_t *tiles, size_t ntiles, aabb_t bbox)
   return 0;
 }
 
+/*
+   Tile split for limited memory on the gpu.
+   Division is linearly spaced on z.
+*/
+typedef struct _subdiv_t
+{ int i,n,d;
+  int64_t dz_nm,dz_px,zmax;
+  float *transform;
+  nd_t   carray;
+} *subdiv_t;
+static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim)
+{ subdiv_t ctx=0;
+  size_t free,total,factor;
+  TRY(ndndim(in)>3); // assume there's a z.
+  NEW(struct _subdiv_t,ctx,1);
+  ZERO(struct _subdiv_t,ctx,1);
+  cudaMemGetInfo(&free,&total);
+  ctx->n=(ndnbytes(in)*2+free)/free; /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
+  ctx->transform=transform;
+  ctx->d=ndim;
+  ctx->zmax =ndshape(in)[2];
+  if(ctx->n==1) // nothing to do - single iteration
+  { ctx->carray=in;
+    return ctx;
+  }
+  TRY(ctx->carray=ndreshape(
+                ndcast(
+                  ndref(ndinit(),nddata(in),ndkind(in)),
+                  ndtype(in)),
+                ndndim(in),ndshape(in)));
+  ctx->dz_px=1+ndshape(ctx->carray)[2]/ctx->n; // make blocks big enough to account for rounding errors, last block will be small
+  ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
+  ctx->dz_nm=ctx->dz_px*transform[(ndim+2)*2];
+  return ctx;
+Error:
+  return 0;
+}
+static void free_subdiv(subdiv_t ctx) 
+{ if(ctx)
+  { if(ctx->n>1)
+      ndfree(ndref(ctx->carray,0,nd_unknown_kind));
+    free(ctx);
+  }
+};
+static nd_t subdiv_vol(subdiv_t ctx)       {return ctx->carray;}
+static float* subdiv_xform(subdiv_t ctx)   {return ctx->transform;}
+static int  next_subdivision(subdiv_t ctx)
+{ if(++ctx->i<ctx->n)
+  { TRY(ctx->n>1); // sanity check..remove once confirmed
+    if((ctx->i+1)*ctx->dz_px>ctx->zmax) // adjust last block if necessary
+      ndshape(ctx->carray)[2]=ctx->zmax-ctx->i*ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
+    ndoffset(ctx->carray,2,ctx->dz_px);
+    ctx->transform[(ctx->d+1)*2+ctx->d]+=ctx->dz_nm;
+    return 1;
+  }
+Error:
+  return 0;
+}
+
 /**
- * FIXME: Can not assume all tiles have the same size. (fixed: ngc)
+ * Does not assume all tiles have the same size. (fixed: ngc)
  */
 static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
 { nd_t out=0,in=0,t=0;
   size_t i;
   tile_t *tiles;
+  subdiv_t subdiv=0;
   TRY(tiles=TileBaseArray(desc->tiles));
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
@@ -452,12 +522,16 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
-    TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,TileTransform(tiles[i]),ndndim(in)));
-    TIME(TRY(t=aafilt(in,desc->transform,&desc->fws)));                         // t is on the gpu
-    TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
+    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in)));
+    do
+    { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
+      TIME(TRY(t=aafilt(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
+      TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
+    } while(next_subdivision(subdiv));
   }
 Finalize:
   PROGRESS(ENDL);
+  free_subdiv(subdiv);
   ndfree(in);
   return out;
 Error:

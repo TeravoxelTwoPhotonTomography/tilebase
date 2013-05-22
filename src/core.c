@@ -163,6 +163,12 @@ Error:
   return 0.0;
 }
 
+/** Gets the tile path.
+    \returns a const string with the tile's path.
+ */
+const char* TilePath(tile_t self)
+{ return self->path;
+}
 
 /**
  * Get pixel to space transform.

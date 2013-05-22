@@ -53,6 +53,7 @@ ndio_t  TileFile(tile_t self); // returned file handle already opened.  Owned by
 nd_t    TileShape(tile_t self);// returned array is still owned by the tile.
 float*  TileTransform(tile_t self);
 float   TileVoxelSize(tile_t self, unsigned idim);
+const char* TilePath(tile_t self); // returned string is owned by the tile.
 
 //loader_t    TileBaseCreateLoader(tiles_t self);
 

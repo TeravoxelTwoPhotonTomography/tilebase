@@ -112,6 +112,7 @@ endforeach(PLUGIN)
 add_subdirectory(app/export)
 add_subdirectory(app/tilebase-cache-build)
 add_subdirectory(app/query-aabb)
+add_subdirectory(app/query-name)
 
 ###############################################################################
 #  Testing

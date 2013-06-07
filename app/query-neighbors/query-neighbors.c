@@ -73,7 +73,7 @@ int main(int argc,char*argv[])
           push(i);
       }
     }
-    TRY(i=pop());
+    TRY((i=pop())>=0);
     TRY(qbox=TileAABB(ts[i]));
     printf("Looking for neighbors of:\n\t%s\n",TilePath(ts[i]));
   }

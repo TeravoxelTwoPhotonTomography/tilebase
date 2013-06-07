@@ -109,7 +109,7 @@ struct _tilebase_cache_t
 /** Stand-in for realpath() for windows that uses GetFullPathName().
  *  Only conforms to how realpath is used here.  Does not conform to POSIX.
  */
-static char *realpath(const char* path,char *out)
+static char* realpath(const char* path,char *out)
 { int n=0;
   TRY(n=GetFullPathName(path,out?MAX_PATH:0,out,NULL));
   if(!out)
@@ -122,8 +122,26 @@ Error:
   return 0;
 }
 
-#define LOG(...) tblog(self,__VA_ARGS__) // restor the normal logger
-#endif
+#define LOG(...) tblog(self,__VA_ARGS__) // restore the normal logger
+#endif // _MSC_VER
+
+#undef  LOG
+#define LOG(...) fprintf(stderr,__VA_ARGS__)
+/** If realpath fails, just pass path to out.
+    Always allocates out if out is passed in as NULL.
+ */
+static char* maybeRealPath(const char* path, char *out)
+{ if(!(out=realpath(path,out)))
+  { NEW(char,out,strlen(path)+1);
+    ZERO(char,out,strlen(path)+1);
+    memcpy(out,path,strlen(path));
+  }
+  return out;
+Error:
+  return 0;
+}
+#undef  LOG
+#define LOG(...) tblog(self,__VA_ARGS__) // restore the normal logger
 
 /** Returns the number of elements in an affine transform for an
  *  \a n-dimensional vector.
@@ -400,7 +418,7 @@ void* root(tilebase_cache_t self)
       yaml_event_delete(EVENT);
       TRY(yaml_parser_parse(PARSER,EVENT)); // consume key without checking it.. should be "path"
       { char *rpath=0;
-        TRY(rpath=realpath(E_VAL,NULL));
+        TRY(rpath=maybeRealPath(E_VAL,NULL));
       //printf("\t%s: %s\n","Root path",rpath);
         memcpy(ROOT,rpath,strlen(rpath));
         free(rpath);
@@ -490,7 +508,7 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   strncat(fpath,PATHSEP,sizeof(fpath)-strlen(fpath)-1);
   strncat(fpath,fname,sizeof(fpath)-strlen(fpath)-1);
 
-  TRY(rpath=realpath(path,NULL));
+  TRY(rpath=maybeRealPath(path,NULL));
 
   TRY(FP=fopen(fpath,mode));
   switch(mode[0])
@@ -594,7 +612,7 @@ tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path_, ti
   size_t *dims;
   char path[PATH_MAX+1]={0};
   TRY(self);
-  TRY(realpath(path_,path));// canonicalize input path
+  TRY(maybeRealPath(path_,path));// canonicalize input path
   // assert all the attributes we need to read exist.
   TRY(AABBGet(TileAABB(t),&ndim,&ori,&shape));
   tid=ndtype(TileShape(t));

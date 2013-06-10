@@ -45,10 +45,26 @@ unsigned hit(tile_t *a, void *ctx)
   return AABBHit(TileAABB(*a),box);
 }
 
+unsigned hit_nocorners(tile_t *a, void *ctx)
+{ if(hit(a,ctx))
+  { aabb_t ref=(aabb_t)ctx,
+         other=TileAABB(*a);
+    size_t i,n,c=0;
+    int64_t *a,*b;
+    AABBGet(ref  ,&n,&a,0);
+    AABBGet(other,0 ,&b,0);
+    for(i=0;i<n;++i)
+      c+=(a[i]!=b[i]);
+    return (c<=1);
+  }
+  return 0;
+}
+
 const char* signstr(aabb_t ref, aabb_t other)
 { static char buf[1024]={0};
   size_t i,n;
   int64_t *a,*b;
+
   AABBGet(ref  ,&n,&a,0);
   AABBGet(other,0 ,&b,0);
   memset(buf,0,sizeof(buf));
@@ -65,11 +81,15 @@ int main(int argc,char*argv[])
   tiles_t tb=0;
   regex_t reg={0};
   aabb_t qbox=0;
+  unsigned (*predicate)(tile_t *a,void *ctx)=hit;
   regaparams_t params={0};
   regamatch_t  match={0};
 
   opts=parsargs(&argc,&argv,&isok);
   if(!isok) return 1;
+
+  if(opts.nocorners)
+    predicate=hit_nocorners;
 
   TRY(0==tre_regcomp(&reg,opts.query,REG_NOSUB));
   params.cost_ins   =opts.ins;
@@ -106,7 +126,7 @@ int main(int argc,char*argv[])
     char *root=0;
     tilebase_cache_t out=0;
     size_t nout=0;
-    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&nout,hit,qbox));
+    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&nout,predicate,qbox));
     TileBaseCacheClose(
       TileBaseCacheWriteMany(
         out=TileBaseCacheOpenWithRoot(opts.output,"w",root=TilesCommonRoot(ts,nout)),
@@ -121,7 +141,7 @@ int main(int argc,char*argv[])
   } else
   { tile_t *ts=0;
     size_t i,n=0;  
-    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&n,hit,qbox));
+    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&n,predicate,qbox));
     for(i=0;i<n;++i)
       printf("%s %s\n",signstr(qbox,TileAABB(ts[i])),TilePath(ts[i]));
     if(ts) free(ts);

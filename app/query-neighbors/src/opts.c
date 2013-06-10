@@ -33,7 +33,7 @@
 //-- TYPES --------------------------------------------------------------------- 
 typedef int  (*validator_t)(const char* s);
 typedef int  (*parse_t)    (opts_t* ctx,const char* s);
-typedef void (*callback_t) ();
+typedef void (*callback_t) (opts_t* ctx);
 
 struct opt_state_t
 { int is_found;
@@ -63,6 +63,7 @@ typedef struct _arg_t
 
 //-- SPEC ----------------------------------------------------------------------
 static void help();
+static void nocorners(opts_t *opts);
 static int  validate_path(const char* s);
 static int  is_valid_output(const char* s);
 static int  is_positive_int(const char* s);
@@ -79,6 +80,7 @@ static char** ARGV;
 static opt_t SPEC[]=
 { 
   {NULL,NULL,help,1,"-h","--help",NULL, "Display this help message.",{0}},
+  {NULL,NULL,nocorners,1,"-nc","--no-corners",NULL,"Only use neighbors that share a full face.",{0}},
   {NULL,output,NULL,0,"-o","--output",NULL,"Output selected tiles to a the specified file.",{0}},
   {is_positive_int,ins,NULL,0,"-i","--ins-cost","10","Penelty for insertions that had to be made to find a match.",{0}},
   {is_positive_int,del,NULL,0,"-d","--del-cost","10","Penelty for deletions that had to be made to find a match.",{0}},
@@ -113,6 +115,7 @@ static int is_positive_int(const char* s)
   return 0;
 }
 
+static void nocorners(opts_t *ctx)          {ctx->nocorners=1;}
 static int path(opts_t *ctx,const char *s)  {ctx->path=s; return 1;}
 static int query(opts_t *ctx,const char *s) {ctx->query=s; return 1;}
 static int ins(opts_t *ctx,const char *s)   {ctx->ins=strtol(s,0,10); return 1;} 

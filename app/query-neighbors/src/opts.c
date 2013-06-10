@@ -266,7 +266,11 @@ opts_t parsargs(int *argc, char** argv[], int *isok)
       { CALLBACK(iopt,opts);
         hit[iarg]=1;
         if(!SPEC[iopt].is_flag)
-        { if(!VALIDATE(iopt,argv[0][iarg+1]))
+        { if(iarg>=(*argc-1))
+          { LOG("\tAn argument was found but the value was not.\n\tOption \"%s\".\n",argv[0][iarg]);
+            goto Error;
+          }
+          if(!VALIDATE(iopt,argv[0][iarg+1]))
           { LOG("\tArgument validation error.\n\tOption \"%s\" got \"%s\".\n",argv[0][iarg],argv[0][iarg+1]);
             goto Error;
           }

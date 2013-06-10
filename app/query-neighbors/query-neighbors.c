@@ -18,8 +18,6 @@
 #define NEW(T,e,N)        TRY((e)=malloc(sizeof(T)*(N)))
 #define ZERO(T,e,N)       memset((e),0,sizeof(T)*(N))
 
-#define min(a,b) (a<b?a:b)
-
 struct stack_t 
 { int* data;
   int n,sz;
@@ -45,6 +43,20 @@ int pop()   { return (stack.n>0)?(stack.data[--stack.n]):(-1); }
 unsigned hit(tile_t *a, void *ctx)
 { aabb_t box=(aabb_t)ctx;
   return AABBHit(TileAABB(*a),box);
+}
+
+const char* signstr(aabb_t ref, aabb_t other)
+{ static char buf[1024]={0};
+  size_t i,n;
+  int64_t *a,*b;
+  AABBGet(ref  ,&n,&a,0);
+  AABBGet(other,0 ,&b,0);
+  memset(buf,0,sizeof(buf));
+  snprintf(buf,sizeof(buf),"[%s",(a[0]>b[0])?"-":((a[0]<b[0])?"+":" "));
+  for(i=1;i<n;++i)
+    strncat(buf,(a[i]>b[i])?" -":((a[i]<b[i])?" +":"  "),sizeof(buf));
+  strncat(buf,"]",sizeof(buf));
+  return buf;
 }
 
 int main(int argc,char*argv[])
@@ -99,6 +111,7 @@ int main(int argc,char*argv[])
       TileBaseCacheWriteMany(
         out=TileBaseCacheOpenWithRoot(opts.output,"w",root=TilesCommonRoot(ts,nout)),
         ts,nout));
+    fprintf(stderr,"Count: %d\n",(int)nout);
     if(ts)   free(ts);
     if(root) free(root);
     if(TileBaseCacheError(out))
@@ -107,15 +120,12 @@ int main(int argc,char*argv[])
     }
   } else
   { tile_t *ts=0;
-    int i,n=0;  
-    TRY(ts=TileBaseArray(tb));
-    for(i=0;i<TileBaseCount(tb);++i)
-    { if(AABBHit(qbox,TileAABB(ts[i])))
-      { printf("%s\n",TilePath(ts[i]));
-        n++;
-      }
-    }
-    fprintf(stderr,"Count: %d\n",n);
+    size_t i,n=0;  
+    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&n,hit,qbox));
+    for(i=0;i<n;++i)
+      printf("%s %s\n",signstr(qbox,TileAABB(ts[i])),TilePath(ts[i]));
+    if(ts) free(ts);
+    fprintf(stderr,"Count: %d\n",(int)n);
   }
 
 Finalize:

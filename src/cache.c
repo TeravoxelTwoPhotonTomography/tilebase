@@ -131,12 +131,15 @@ Error:
     Always allocates out if out is passed in as NULL.
  */
 static char* maybeRealPath(const char* path, char *out)
-{ if(!(out=realpath(path,out)))
-  { NEW(char,out,strlen(path)+1);
-    ZERO(char,out,strlen(path)+1);
-    memcpy(out,path,strlen(path));
+{ char *o=0;
+  if(!(o=realpath(path,out)))
+  { o=out;
+    if(!o)
+      NEW(char,o,strlen(path)+1);
+    ZERO(char,o,strlen(path)+1);
+    memcpy(o,path,strlen(path));
   }
-  return out;
+  return o;
 Error:
   return 0;
 }
@@ -509,13 +512,41 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
   strncat(fpath,fname,sizeof(fpath)-strlen(fpath)-1);
 
   TRY(rpath=maybeRealPath(path,NULL));
+  self=TileBaseCacheOpenWithRoot(fpath,mode,rpath);
+  if(rpath) free(rpath);
+  return self;
+Error:
+  if(rpath) free(rpath);
+  LOG("\tpath: %s"ENDL "\tmode: %s"ENDL,fpath[0]?fpath:"(none)",mode?mode:"(none)");
+  TileBaseCacheClose(self);
+  return 0;
+}
 
+/**
+ * Read/writes a tilebase cache file to filename.
+ * 
+ * When writing \a root specifies the root path element against which to
+ * relatively find tiles.
+ *
+ * When reading, if not NULL, \a root should point to an allocated array of
+ * MAX_PATH chars.  This will be filled with the root path element specifed in
+ * the opened cache file.
+ */
+tilebase_cache_t TileBaseCacheOpenWithRoot(const char *fpath, const char *mode, char* rpath)
+{ tilebase_cache_t self;
+
+  NEW(struct _tilebase_cache_t,self,1);
+  ZERO(struct _tilebase_cache_t,self,1);
   TRY(FP=fopen(fpath,mode));
   switch(mode[0])
   { case 'r':
       self->mode=READ;
       TRY(yaml_parser_initialize(PARSER));
       yaml_parser_set_input_file(PARSER,FP);
+      if(rpath)
+      { memcpy(rpath,ROOT,strlen(ROOT));
+        rpath[strlen(ROOT)]='\0';
+      }
       break;
     case 'w':
       self->mode=WRITE;
@@ -535,10 +566,8 @@ tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
       break;
     default: FAIL("Unrecognized mode.");
   }
-  if(rpath) free(rpath);
   return self;
 Error:
-  if(rpath) free(rpath);
   LOG("\tpath: %s"ENDL "\tmode: %s"ENDL,fpath[0]?fpath:"(none)",mode?mode:"(none)");
   TileBaseCacheClose(self);
   return 0;
@@ -639,6 +668,16 @@ tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path_, ti
     emit_seq_f32(self,ntransform(ndndim(TileShape(t))),TileTransform(t));
   MAP_END; EMIT;
 
+  return self;
+Error:
+  return 0;
+}
+
+tilebase_cache_t TileBaseCacheWriteMany(tilebase_cache_t self, tile_t *t, size_t ntiles)
+{ size_t i;
+  TRY(self);
+  for(i=0;i<ntiles;++i)
+    self=TileBaseCacheWrite(self,TilePath(t[i]),t[i]);
   return self;
 Error:
   return 0;

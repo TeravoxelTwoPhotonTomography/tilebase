@@ -41,62 +41,10 @@ Error:
 void clear() { stack.n=0; }
 int pop()   { return (stack.n>0)?(stack.data[--stack.n]):(-1); }
 
-// caller must free returned value
-// Usage: TRY(out=filter(in,n,&nout,testfun,ctx));
-tile_t *filter(tile_t *in, size_t n, size_t *nout, unsigned (*test)(tile_t *a,void *ctx), void *ctx)
-{ size_t i,c=0;
-  tile_t *out=0;
-  NEW(tile_t,out,n);
-  ZERO(tile_t,out,n);
-  for(i=0;i<n;++i)
-    if(test(in+i,ctx))
-      out[c++]=in[i];
-  if(nout) *nout=c;
-  return out;
-Error:
-  if(out) free(out);
-  return 0;
-}
 
 unsigned hit(tile_t *a, void *ctx)
 { aabb_t box=(aabb_t)ctx;
   return AABBHit(TileAABB(*a),box);
-}
-
-unsigned ispathsep(char c)
-{ switch(c)
-  {
-#ifdef _MSC_VER
-    case '\\':
-#endif
-    case '/': return 1;
-  default:
-    return 0;
-  }
-}
-
-// caller must free returned string
-char* commonroot(const tile_t* tiles, size_t ntiles)
-{ size_t n,i,j,s; // s marks the last path sep
-  const char *ref=0;
-  TRY(ntiles>0);
-  n=strlen(ref=TilePath(tiles[0]))+1; // n is first diff, so one past last
-  for(i=1;i<ntiles;++i)
-  { const char *b=TilePath(tiles[i]);
-    n=min(n,strlen(b)+1);
-    for(j=0;j<n && (b[j]==ref[j]);j++)
-      if(ispathsep(b[j]))
-        s=j;
-    n=min(j,s+1);
-  }
-  { char *out=0;
-    NEW(char,out,n+1);
-    memcpy(out,ref,n);
-    out[n]='\0';
-    return out;
-  }
-Error:
-  return 0;
 }
 
 int main(int argc,char*argv[])
@@ -146,11 +94,12 @@ int main(int argc,char*argv[])
     char *root=0;
     tilebase_cache_t out=0;
     size_t nout=0;
-    TRY(ts=filter(TileBaseArray(tb),TileBaseCount(tb),&nout,hit,qbox));
+    TRY(ts=TilesFilter(TileBaseArray(tb),TileBaseCount(tb),&nout,hit,qbox));
     TileBaseCacheClose(
       TileBaseCacheWriteMany(
-        out=TileBaseCacheOpenWithRoot(opts.output,"w",root=commonroot(ts,nout)),
+        out=TileBaseCacheOpenWithRoot(opts.output,"w",root=TilesCommonRoot(ts,nout)),
         ts,nout));
+    if(ts)   free(ts);
     if(root) free(root);
     if(TileBaseCacheError(out))
     { LOG("Error writing selected tiles to tilebase cache.\n\t%s\n\n",TileBaseCacheError(out));

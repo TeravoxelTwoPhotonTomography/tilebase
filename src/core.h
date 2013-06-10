@@ -55,7 +55,9 @@ float*  TileTransform(tile_t self);
 float   TileVoxelSize(tile_t self, unsigned idim);
 const char* TilePath(tile_t self); // returned string is owned by the tile.
 
-//loader_t    TileBaseCreateLoader(tiles_t self);
+
+char*   TilesCommonRoot(const tile_t* tiles, size_t ntiles);
+tile_t* TilesFilter(tile_t *in, size_t n, size_t *nout, unsigned (*test)(tile_t *a,void *ctx), void *ctx);
 
 #ifdef __cplusplus
 } //extern "C"

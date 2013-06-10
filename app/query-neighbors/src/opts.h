@@ -1,6 +1,7 @@
 typedef struct _opts_t
 { const char * path;
   const char * query;
+  const char * output;   // if not null, output selected tiles in a cache file here
   int ins,del,subst,max; // cost structure for approximate matching
 } opts_t;
 

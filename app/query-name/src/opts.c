@@ -110,7 +110,7 @@ static int query(opts_t *ctx,const char *s) {ctx->query=s; return 1;}
 static int ins(opts_t *ctx,const char *s)   {ctx->ins=strtol(s,0,10); return 1;} 
 static int del(opts_t *ctx,const char *s)   {ctx->del=strtol(s,0,10); return 1;} 
 static int subst(opts_t *ctx,const char *s) {ctx->subst=strtol(s,0,10); return 1;} 
-static int max(opts_t *ctx,const char *s)   {ctx->max=strtol(s,0,10); return 1;} 
+static int max(opts_t *ctx,const char *s)   {ctx->max=strtol(s,0,10); return 1;}
 
 //-- HANDLING ------------------------------------------------------------------
 // Given SPEC and ARGS, handling is pretty general.  Could split out to an API

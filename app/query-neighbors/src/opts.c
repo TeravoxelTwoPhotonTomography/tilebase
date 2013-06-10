@@ -64,6 +64,7 @@ typedef struct _arg_t
 //-- SPEC ----------------------------------------------------------------------
 static void help();
 static int  validate_path(const char* s);
+static int  is_valid_output(const char* s);
 static int  is_positive_int(const char* s);
 static int  path(opts_t *ctx,const char *s);
 static int  query(opts_t *ctx,const char *s);
@@ -71,12 +72,14 @@ static int  ins(opts_t *ctx,const char *s);
 static int  del(opts_t *ctx,const char *s);
 static int  subst(opts_t *ctx,const char *s);
 static int  max(opts_t *ctx,const char *s);
+static int  output(opts_t *ctx,const char *s);
 
 static int    ARGC;
 static char** ARGV;
 static opt_t SPEC[]=
 { 
-  { NULL,NULL,help,1,"-h","--help",NULL, "Display this help message.",{0}},
+  {NULL,NULL,help,1,"-h","--help",NULL, "Display this help message.",{0}},
+  {NULL,output,NULL,0,"-o","--output",NULL,"Output selected tiles to a the specified file.",{0}},
   {is_positive_int,ins,NULL,0,"-i","--ins-cost","10","Penelty for insertions that had to be made to find a match.",{0}},
   {is_positive_int,del,NULL,0,"-d","--del-cost","10","Penelty for deletions that had to be made to find a match.",{0}},
   {is_positive_int,subst,NULL,0,"-s","--subs-cost","10","Penelty for substitutions that had to be made to find a match.",{0}},
@@ -97,6 +100,11 @@ static int validate_path(const char *path)
   return S_ISDIR(s.st_mode);
 }
 
+static int is_valid_output(const char* s)
+{ if(s) return validate_path(s);
+  return 1; // NULL is ok
+}
+
 static int is_positive_int(const char* s)
 { char *end=0;
   long v=strtol(s,&end,10);
@@ -110,7 +118,8 @@ static int query(opts_t *ctx,const char *s) {ctx->query=s; return 1;}
 static int ins(opts_t *ctx,const char *s)   {ctx->ins=strtol(s,0,10); return 1;} 
 static int del(opts_t *ctx,const char *s)   {ctx->del=strtol(s,0,10); return 1;} 
 static int subst(opts_t *ctx,const char *s) {ctx->subst=strtol(s,0,10); return 1;} 
-static int max(opts_t *ctx,const char *s)   {ctx->max=strtol(s,0,10); return 1;} 
+static int max(opts_t *ctx,const char *s)   {ctx->max=strtol(s,0,10); return 1;}
+static int output(opts_t *ctx,const char *s){ctx->output=s; return 1;}
 
 //-- HANDLING ------------------------------------------------------------------
 // Given SPEC and ARGS, handling is pretty general.  Could split out to an API

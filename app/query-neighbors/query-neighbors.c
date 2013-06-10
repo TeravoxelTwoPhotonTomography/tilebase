@@ -38,6 +38,7 @@ Error:
 }
 void clear() { stack.n=0; }
 int pop()   { return (stack.n>0)?(stack.data[--stack.n]):(-1); }
+int count() { return stack.n; }
 
 
 unsigned hit(tile_t *a, void *ctx)
@@ -117,10 +118,21 @@ int main(int argc,char*argv[])
           push(i);
       }
     }
-    TRY((i=pop())>=0);
-    TRY(qbox=TileAABB(ts[i]));
-    fprintf(stderr,"Looking for neighbors of:\n\t%s\n",TilePath(ts[i]));
+    if(count()>1)
+    { fprintf(stderr,"Found multiple matches:\n");
+      while((i=pop())>=0)
+        fprintf(stderr,"\t%s\n",TilePath(ts[i])); 
+      goto Finalize;
+    }
+    if((i=pop())>=0)
+    { TRY(qbox=TileAABB(ts[i]));
+      fprintf(stderr,"Looking for neighbors of:\n\t%s\n",TilePath(ts[i]));
+    } else
+    { fprintf(stderr,"No matching tiles found.\n");
+      goto Finalize;
+    }
   }
+
   if(opts.output)
   { tile_t *ts=0;
     char *root=0;

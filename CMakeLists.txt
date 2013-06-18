@@ -114,6 +114,7 @@ add_subdirectory(app/tilebase-cache-build)
 add_subdirectory(app/query-aabb)
 add_subdirectory(app/query-name)
 add_subdirectory(app/query-neighbors)
+add_subdirectory(app/align-pair)
 
 ###############################################################################
 #  Testing
@@ -137,7 +138,7 @@ if(GTEST_FOUND AND TEST_SOURCES)
     ${PLUGINS}
   )
   set_target_properties(test-tilebase PROPERTIES 
-    INSTALL_RPATH             ${RPATH}
+    INSTALL_RPATH ${RPATH}
   )
   nd_copy_plugins_to_target(test-tilebase ${ND_PLUGINS})
   gtest_copy_shared_libraries(test-tilebase)

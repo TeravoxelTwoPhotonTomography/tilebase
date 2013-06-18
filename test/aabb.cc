@@ -63,6 +63,16 @@ TEST_F(AABB,UnionIP)
   AABBFree(e);
 }
 
+TEST_F(AABB,IntersectIP)
+{ int64_t eo[]={10,21,30},
+          es[]={29,60,27};
+  aabb_t e;
+  EXPECT_TRUE(e=AABBSet(NULL,countof(eo),eo,es));
+  EXPECT_EQ(a,AABBIntersectIP(a,c));
+  EXPECT_TRUE(AABBSame(a,e));
+  AABBFree(e);
+}
+
 TEST_F(AABB,Hit)
 { EXPECT_TRUE(AABBHit(a,c));
   EXPECT_TRUE(AABBHit(c,a));

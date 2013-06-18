@@ -27,6 +27,7 @@ int    AABBSame(aabb_t a, aabb_t b);
 int    AABBHit(aabb_t a, aabb_t b);
 aabb_t AABBBinarySubdivision(aabb_t *out, unsigned n, aabb_t a); // n=4 quad, n==8 oct etc...
 aabb_t AABBUnionIP(aabb_t dst, aabb_t src);
+aabb_t AABBIntersectIP(aabb_t dst, aabb_t src);
 
 double AABBVolume(aabb_t self);
 

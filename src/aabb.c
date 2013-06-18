@@ -235,6 +235,33 @@ Error:
 }
 
 /**
+ * Contracts \a dst to the intersection between \a src and \a dst.
+ * 
+ * If \a dst is NULL, it's treated as an empty box.  A new box is created and
+ * returned.  In that case, the caller is responsible for freeing the returned box with
+ * AABBFree().
+ */
+aabb_t AABBIntersectIP(aabb_t dst, aabb_t src)
+{ int i;
+  if(!src) return dst;
+  if(!dst) TRY(dst=AABBCopy(dst,src));
+  TRY(dst->ndim==src->ndim);
+  for(i=0;i<dst->ndim;++i)
+  { int64_t d=dst->ori[i]+dst->shape[i],
+            s=src->ori[i]+src->shape[i],
+            r=(d<s)?d:s;
+    _mx(dst->ori+i,src->ori[i]);
+    dst->shape[i]=r-dst->ori[i];
+    _mx(dst->shape,0LL);
+  }
+  return dst;
+Error:
+  return 0;
+
+
+}
+
+/**
  * Returns the volume of the bounding box in physical units (nanometers).
  */
 double AABBVolume(aabb_t self)

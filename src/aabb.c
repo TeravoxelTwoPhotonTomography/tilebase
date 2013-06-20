@@ -70,6 +70,7 @@ Error:
 void AABBFree(aabb_t self)
 { if(!self) return;
   SAFEFREE(self->ori);
+  SAFEFREE(self->shape);
   free(self);
 }
 
@@ -132,8 +133,7 @@ static int same(size_t n, int64_t *restrict a, int64_t *restrict b)
 }
 
 int AABBSame(aabb_t a, aabb_t b)
-{ size_t i;
-  if(a->ndim!=b->ndim) return 0;
+{ if(a->ndim!=b->ndim) return 0;
   return same(a->ndim,a->ori  ,b->ori) &&
          same(a->ndim,a->shape,b->shape);
 }

@@ -48,6 +48,7 @@ float   TileBaseVoxelSize(tiles_t self, unsigned idim);
 
 tile_t  TileNew(const char* path,const char* metadata_format);
 void    TileFree(tile_t tile);
+// void    TileFreeArray(tile_t *tiles,size_t sz); // -- as of now, don't want this public bc it closes referenced tiles.
 aabb_t  TileAABB(tile_t self); // returned AABB owned by tile.
 ndio_t  TileFile(tile_t self); // returned file handle already opened.  Owned by tile.
 nd_t    TileShape(tile_t self);// returned array is still owned by the tile.

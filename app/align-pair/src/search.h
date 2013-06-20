@@ -12,7 +12,7 @@ extern "C" {
 
    Returns 0, or a tile reference when the query matches only a single tile.
 */
-tile_t* FindByName(
+tile_t FindByName(
   tile_t *ts,
   size_t ntiles,
   const char* query,

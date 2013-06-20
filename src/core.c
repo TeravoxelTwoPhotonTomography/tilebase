@@ -15,6 +15,8 @@
  *  \author Nathan Clack
  *  \date   July 2012
  */
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdlib.h>
 #include "nd.h"
 #include "aabb.h"
@@ -31,6 +33,7 @@
 #ifdef _MSC_VER
 #include "util/dirent.win.h"
 #define PATHSEP '\\'
+#undef  min
 #else
 #include <dirent.h>
 #define PATHSEP '/'
@@ -109,7 +112,6 @@ void TileFree(tile_t self)
 tile_t TileNew(const char* path, const char* metadata_format)
 { tile_t out=0;
   metadata_t meta=0;
-  unsigned n;
   NEW(struct _tile_t,out,1);
   ZERO(struct _tile_t,out,1);
   strncpy(out->path,path,sizeof(out->path));
@@ -211,8 +213,8 @@ Error:
 
 static int maybe_resize(tiles_t self,size_t nelem)
 { if(nelem>self->cap)
-    self->cap=nelem*1.2+50;
-  TRY(self->tiles=realloc(self->tiles,self->cap*sizeof(tile_t)));
+    self->cap=(size_t)(nelem*1.2+50);
+  TRY(self->tiles=(tile_t*)realloc(self->tiles,self->cap*sizeof(tile_t)));
   return 1;
 Error:
   return 0;
@@ -388,17 +390,25 @@ Error:
   return 0;
 }
 
+/** 
+ * Free a contiguous array of tiles.
+ */
+void TileFreeArray(tile_t *tiles,size_t sz)
+{ if(tiles)
+  { size_t i;
+    for(i=0;i<sz;++i)
+      TileFree(tiles[i]);
+    free(tiles);
+  }
+}
+
 /**
  * Release resources.
  */
 void TileBaseClose(tiles_t self)
 { if(!self) return;
-  if(self->tiles)
-  { size_t i;
-    for(i=0;i<self->sz;++i)
-      TileFree(self->tiles[i]);
-    free(self->tiles);
-  }
+  TileFreeArray(self->tiles,self->sz);  
+  free(self);
 }
 
 /**
@@ -426,8 +436,6 @@ aabb_t TileBaseAABB(tiles_t self)
   for(i=0;i<self->sz;++i)
     out=AABBUnionIP(out,TileAABB(self->tiles[i]));
   return out;
-Error:
-  return 0;
 }
 
 /**

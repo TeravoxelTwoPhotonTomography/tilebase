@@ -107,14 +107,21 @@ struct nd_subarray_t AABBToSubarray(tile_t self, aabb_t box_nm)
 { aabb_t box_px=0;
   struct nd_subarray_t out={0};
   TRY(box_px=AABBToPx(self,box_nm)); // should already be cropped to tile
-  { size_t ndim;
+  { size_t ndim,i;
     int64_t *ori,*shape;
+    nd_t s=TileShape(self);
     AABBGet(box_px,&ndim,&ori,&shape);
-    ndPushShape(TileShape(self));
-    ndreshape(TileShape(self),ndim,int64_to_static_sizet(shape,ndim));
-    out.shape=ndheap(TileShape(self));
-    ndPopShape(TileShape(self));
-    out.ori=int64_to_new_sizet(ori,ndim);
+    ndPushShape(s);
+    for(i=0;i<ndim;++i)
+      ndShapeSet(s,(unsigned)i,(size_t)shape[i]); // leave the non spatial dimensions the same.  This will get all color channels, for example.
+    out.shape=ndheap(s);
+    ndPopShape(s);
+
+    TRY(out.ori=(size_t*)malloc(sizeof(size_t)*ndndim(s)));
+    for(i=0;i<ndim;++i)
+      out.ori[i]=(size_t)ori[i];
+    for(;i<ndndim(s);++i)
+      out.ori[i]=0;
   }  
 Finalize:
   AABBFree(box_px);

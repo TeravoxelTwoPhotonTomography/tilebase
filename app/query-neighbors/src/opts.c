@@ -9,6 +9,7 @@
  * - maybe change callback type so encountering an option can effect a state transition
  * - Make SPEC and ARGS settable - hence making the option parsing an API
  */
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -25,9 +26,14 @@
 #define TRY(e)            do{if(!(e)){REPORT(#e,"Expression evaluated as false"); goto Error;}}while(0)
 
 #ifdef _MSC_VER
- #define PATHSEP '\\'
+  #include <malloc.h>
+  #define alloca      _alloca
+  #define snprintf    _snprintf
+  #define PATHSEP    '\\'
+  #define S_ISDIR(B) ((B)&_S_IFDIR)
+  #undef max
 #else
- #define PATHSEP '/'
+  #define PATHSEP '/'
 #endif
 
 //-- TYPES --------------------------------------------------------------------- 
@@ -62,7 +68,7 @@ typedef struct _arg_t
 } arg_t;
 
 //-- SPEC ----------------------------------------------------------------------
-static void help();
+static void help(opts_t *opts);
 static void nocorners(opts_t *opts);
 static int  validate_path(const char* s);
 static int  is_valid_output(const char* s);
@@ -147,7 +153,7 @@ static void reporter(const char *file,int line,const char* function,const char*f
 static void writehelp(int maxwidth,const char* lhs,int width,const char* help)
 { 
   char helpbuf[1024]={0};
-  int n,r=strlen(help); // remainder of help text to write
+  int n,r=(int)strlen(help); // remainder of help text to write
   char t, // temp
       *s, // the line split point: last space in the current range or a newline
       *h=helpbuf; // current pos in help string
@@ -223,11 +229,11 @@ static void usage()
   }
   // width of left column
   for(i=0;i<countof(ARGS);++i)
-  { size_t n=strlen(ARGS[i].state.buf);
+  { int n=(int)strlen(ARGS[i].state.buf);
     width=(n>width)?n:width;
   }
   for(i=0;i<countof(SPEC);++i)
-  { size_t n=strlen(SPEC[i].state.buf);
+  { int n=(int)strlen(SPEC[i].state.buf);
     width=(n>width)?n:width;
   }
 
@@ -242,7 +248,7 @@ static void usage()
   printf("\n");
 }
 
-static void help()
+static void help(opts_t *opts)
 { usage(); exit(0); 
 }
 

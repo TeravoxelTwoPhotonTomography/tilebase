@@ -9,6 +9,8 @@
  * - maybe change callback type so encountering an option can effect a state transition
  * - Make SPEC and ARGS settable - hence making the option parsing an API
  */
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -25,9 +27,13 @@
 #define TRY(e)            do{if(!(e)){REPORT(#e,"Expression evaluated as false"); goto Error;}}while(0)
 
 #ifdef _MSC_VER
- #define PATHSEP '\\'
+  #include <malloc.h>
+  #define alloca      _alloca
+  #define snprintf    _snprintf
+  #define PATHSEP    '\\'
+  #define S_ISDIR(B) ((B)&_S_IFDIR)
 #else
- #define PATHSEP '/'
+  #define PATHSEP '/'
 #endif
 
 //-- TYPES --------------------------------------------------------------------- 
@@ -104,7 +110,9 @@ static void markls()
 /** s must be parsable as a double between 0 and 1 */
 static int validate_coord(const char* s)
 { char *end=0;
-  double d=strtod(s,&end);
+  double d;
+  if(!s) return 0;
+  d=strtod(s,&end);
   if(end==s)         return 0;
   if(d<0.0 || 1.0<d) return 0;
   return 1;
@@ -148,7 +156,7 @@ static void reporter(const char *file,int line,const char* function,const char*f
 static void writehelp(int maxwidth,const char* lhs,int width,const char* help)
 { 
   char helpbuf[1024]={0};
-  int n,r=strlen(help); // remainder of help text to write
+  int n,r=(int)strlen(help); // remainder of help text to write
   char t, // temp
       *s, // the line split point: last space in the current range or a newline
       *h=helpbuf; // current pos in help string
@@ -224,11 +232,11 @@ static void usage()
   }
   // width of left column
   for(i=0;i<countof(ARGS);++i)
-  { size_t n=strlen(ARGS[i].state.buf);
+  { int n=(int)strlen(ARGS[i].state.buf);
     width=(n>width)?n:width;
   }
   for(i=0;i<countof(SPEC);++i)
-  { size_t n=strlen(SPEC[i].state.buf);
+  { int n=(int)strlen(SPEC[i].state.buf);
     width=(n>width)?n:width;
   }
 
@@ -288,13 +296,15 @@ opts_t parsargs(int *argc, char** argv[], int *isok)
   // apply default value for missing arguments
   for(iopt=0;iopt<countof(SPEC);++iopt)
   { if(!SPEC[iopt].is_flag && !SPEC[iopt].state.is_found)
-    { if(!VALIDATE(iopt,SPEC[iopt].def))
-      { LOG("\tDefault argument failed to validate.\n\tOption \"%s\" got \"%s\".\n",SPEC[iopt].shortname,SPEC[iopt].def);
-        goto Error;
-      }
-      if(!PARSE(iopt,opts,SPEC[iopt].def))
-      { LOG("\tDefault argument failed to parse.\n\tOption \"%s\" got \"%s\".\n",SPEC[iopt].shortname,SPEC[iopt].def);
-        goto Error;
+    { if(SPEC[iopt].def) // if a default exists...
+      { if(!VALIDATE(iopt,SPEC[iopt].def))
+        { LOG("\tDefault argument failed to validate.\n\tOption \"%s\" got \"%s\".\n",SPEC[iopt].shortname,SPEC[iopt].def);
+          goto Error;
+        }
+        if(!PARSE(iopt,opts,SPEC[iopt].def))
+        { LOG("\tDefault argument failed to parse.\n\tOption \"%s\" got \"%s\".\n",SPEC[iopt].shortname,SPEC[iopt].def);
+          goto Error;
+        }
       }
     }
   }

@@ -1,5 +1,6 @@
 #include "tre/tre.h"
 #include "search.h"
+#include <stdio.h>
 
 #define LOG(...)          fprintf(stderr,__VA_ARGS__)
 #define REPORT(msg1,msg2) LOG("%s(%d) - %s()\n\t%s\n\t%s\n",__FILE__,__LINE__,__FUNCTION__,msg1,msg2)
@@ -20,7 +21,7 @@ static struct stack_t
 static int push(tile_t* v)
 {
   if(stack.n>=(stack.sz-1))
-  { stack.sz=1.2*stack.n+50;
+  { stack.sz=(int)(1.2*stack.n+50);
     TRY(stack.data=realloc(stack.data,stack.sz*sizeof(tile_t*)));
   }
   stack.data[stack.n++]=v;
@@ -33,7 +34,7 @@ static tile_t* pop()   { return (stack.n>0)?(stack.data[--stack.n]):(NULL); }
 static int count() { return stack.n; }
 
 // --- INTERFACE ---
-tile_t* FindByName(
+tile_t FindByName(
   tile_t *ts,
   size_t ntiles,
   const char* query,
@@ -69,7 +70,9 @@ tile_t* FindByName(
     if(count()>1 && notunique!=0)
       notunique(query,stack.data,stack.n);
   }
-  return pop();
+  tre_regfree(&reg);
+  return *pop();
 Error:
+  tre_regfree(&reg);
   return 0;
 }

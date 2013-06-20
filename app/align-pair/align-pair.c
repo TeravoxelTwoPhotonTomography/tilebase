@@ -13,9 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define restrict __restrict
+
+#define ECHO(e)           LOG("--\t%s\n",#e)
 #define LOG(...)          fprintf(stderr,__VA_ARGS__)
 #define REPORT(msg1,msg2) LOG("%s(%d) - %s()\n\t%s\n\t%s\n",__FILE__,__LINE__,__FUNCTION__,msg1,msg2)
-#define TRY(e)            do{ if(!(e)) {REPORT(#e,"Expression evaluated as false"); goto Error;}}while(0)
+#define TRY(e)            do{ ECHO(e); if(!(e)) {REPORT(#e,"Expression evaluated as false"); goto Error;}}while(0)
 #define NEW(T,e,N)        TRY((e)=malloc(sizeof(T)*(N)))
 #define ZERO(T,e,N)       memset((e),0,sizeof(T)*(N))
 
@@ -65,13 +68,6 @@ static aabb_t prnAABB(aabb_t aabb)
   return aabb;
 }
 
-
-//struct nd_subarray_t AABBToSubarray(tile_t self, aabb_t box_nm);
-static nd_t shapeFromAABB(aabb_t pxbox)
-{
-
-}
-
 /* loads and crops. caller should free returned value. 
 1. transform bbox back to pixel space using the transform specified by tile
 2. use this to determine the shape of the region to read
@@ -79,16 +75,37 @@ static nd_t shapeFromAABB(aabb_t pxbox)
 3. ndioReadSubarray
 */
 nd_t load(tile_t a,aabb_t bbox)
-{ /* TODO */
+{ struct nd_subarray_t sub=AABBToSubarray(a,bbox);
+  AABBFree(prnAABB(AABBToPx(a,bbox)));  
+  ndioReadSubarray(TileFile(a),sub.shape,sub.ori,0);
+  if(sub.ori) free(sub.ori);
+  while(ndndim(sub.shape)>3)
+    sub.shape=ndRemoveDim(sub.shape,ndndim(sub.shape)-1);
 Error:
-  return 0; 
+  return ndconvert_ip(sub.shape,nd_f32);
+}
+
+nd_t ndthreshold(nd_t m,nd_t a,float v)
+{ uint8_t* restrict mm=(uint8_t*)nddata(m);
+  const float* restrict aa=(float*)nddata(a);
+  size_t i;
+  const size_t n=ndnelem(a);
+  TRY(a && m);
+  TRY(ndtype(a)==nd_f32);
+  TRY(ndtype(m)==nd_u8);
+  TRY(ndkind(a)==nd_heap);
+  TRY(ndkind(m)==nd_heap);
+  for(i=0;i<n;++i) mm[i]=(uint8_t)(aa[i]>v);
+  return m;
+Error:
+  return 0;
 }
 
 int main(int argc,char*argv[])
 { opts_t opts;
   int isok,ecode=0;
   tiles_t tb=0;
-  tile_t *a,*b,*neighbors;
+  tile_t a,b,*neighbors;
   aabb_t qbox=0;
   size_t nneighbors;
   unsigned (*predicate)(tile_t *a,void *ctx)=hit;
@@ -104,20 +121,10 @@ int main(int argc,char*argv[])
       TileBaseCount(tb),
       &nneighbors,
       predicate,
-      TileAABB(*a)));
+      TileAABB(a)));
   TRY(b=FindByName(neighbors,nneighbors,opts.query[1],notunique)); // only do second search among neighbors
+  free(neighbors);
 
-  //aabb_t AABBToPx(tile_t self, aabb_t box_nm)
-  printf("--- B[A ---\n");
-  AABBFree(prnAABB(AABBToPx(*b,TileAABB(*a))));
-  { struct nd_subarray_t sub=AABBToSubarray(*b,TileAABB(*a));
-    ndioReadSubarray(TileFile(*b),sub.shape,sub.ori,0);
-    ndioClose(ndioWrite(ndioOpen("test.tif", NULL, "w"),sub.shape));
-    ndfree(sub.shape);
-    if(sub.ori) free(sub.ori);
-  }
-  printf("--- A[B ---\n");
-  AABBFree(prnAABB(AABBToPx(*a,TileAABB(*b))));
 /* TODO */
 /*
 Add options:
@@ -125,19 +132,27 @@ Add options:
   2. intensity threshold for mask
   3. eps for aabb based cropping
  */
-#if FINISHED
+#if 1
   { nd_t va=0,vb=0,ma=0,mb=0,out=0;
     ndxcorr_plan_t plan=0;
-/*TODO*/    TRY(va=load(a,TileAABB(b)));
-/*TODO*/    TRY(vb=load(b,TileAABB(a)));
-    TRY(plan=ndxcorr_make_plan(nd_heap,a,b,10));
+    printf("--- A[B ---\n");
+    TRY(va=load(a,TileAABB(b)));
+    ndioClose(ndioWrite(ndioOpen("AtoB.h5",NULL,"w"),va));
+    printf("--- B[A ---\n");
+    TRY(vb=load(b,TileAABB(a)));
+    ndioClose(ndioWrite(ndioOpen("BtoA.h5",NULL,"w"),vb));
+
+    TRY(plan=ndxcorr_make_plan(nd_heap,va,vb,10));
     TRY(out=ndheap(ndnormxcorr_output_shape(plan)));
 
-/*TODO*/    TRY(ndthreshold(ma=ndheap(va),va,20000));
-/*TODO*/    TRY(ndthreshold(mb=ndheap(vb),vb,20000));
+    TRY(ndthreshold(ma=ndmake_type(va,nd_u8),va,0));
+    TRY(ndthreshold(mb=ndmake_type(vb,nd_u8),vb,0));
+    ndioClose(ndioWrite(ndioOpen("ma.h5",NULL,"w"),ma));
+    ndioClose(ndioWrite(ndioOpen("mb.h5",NULL,"w"),mb));
 
     TRY(ndnormxcorr_masked(out, va, ma, vb, mb, plan));
-/*TODO*/ FindLocalMaxima(out); // build a list of maxima, sortable based on score
+/*TODO*/ //FindLocalMaxima(out); // build a list of maxima, sortable based on score
+    ndioClose(ndioWrite(ndioOpen("out.h5",NULL,"w"),out));
 
     ndxcorr_free_plan(plan);
     ndfree(out);
@@ -146,8 +161,8 @@ Add options:
     ndfree(va);
     ndfree(vb);
   } 
-/*TODO*/ UpdateTransforms();
-/*TODO*/ Output();
+/*TODO*/ //UpdateTransforms();
+/*TODO*/// Output();
 #endif
 
   LOG("OK\n");

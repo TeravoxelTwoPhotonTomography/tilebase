@@ -23,7 +23,7 @@ int push(int v)
 {
 #if 1
   if(stack.n>=(stack.sz-1))
-  { stack.sz=1.2*stack.n+50;
+  { stack.sz=(int)(1.2*stack.n+50);
     TRY(stack.data=realloc(stack.data,stack.sz*sizeof(int)));
   }
   stack.data[stack.n++]=v;

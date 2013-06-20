@@ -2,6 +2,8 @@
  * \file
  * Tilebase cache interface implementation.
  */
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "nd.h"
 #include "cache.h"
 #include "metadata/metadata.h"
@@ -96,7 +98,7 @@ struct _tilebase_cache_t
 #define SEQ_START      TRY(yaml_sequence_start_event_initialize(EVENT,0,0,1,YAML_ANY_SEQUENCE_STYLE))
 #define SEQ_START_FLOW TRY(yaml_sequence_start_event_initialize(EVENT,0,0,1,YAML_FLOW_SEQUENCE_STYLE))
 #define SEQ_END        TRY(yaml_sequence_end_event_initialize(EVENT))
-#define SCALAR(str)    TRY(yaml_scalar_event_initialize(EVENT,0,0,(yaml_char_t*)str,strlen(str),1,1,YAML_ANY_SCALAR_STYLE))
+#define SCALAR(str)    TRY(yaml_scalar_event_initialize(EVENT,0,0,(yaml_char_t*)str,(int)strlen(str),1,1,YAML_ANY_SCALAR_STYLE))
 
 // HELPERS
 
@@ -122,6 +124,7 @@ Error:
   return 0;
 }
 
+#undef LOG
 #define LOG(...) tblog(self,__VA_ARGS__) // restore the normal logger
 #endif // _MSC_VER
 
@@ -169,8 +172,14 @@ static const char* relative(tilebase_cache_t self, const char* fullpath)
     It is assumed that rpath already has the path sepeartor, so this is pretty
     much just a strcat.
 */
-static void join(char *dst, tilebase_cache_t self, const char *rpath)
-{ memcpy(dst,ROOT,strlen(ROOT));
+static void join(char *dst, tilebase_cache_t self, char *rpath)
+{ 
+#if _MSC_VER
+  { size_t i,n=strlen(rpath);
+    for(i=0;i<n;++i) if(rpath[i]=='/') rpath[i]='\\';
+  }
+#endif
+  memcpy(dst,ROOT,strlen(ROOT));
   strcat(dst,rpath);
 }
 
@@ -179,7 +188,7 @@ static unsigned push_back_tile(tilebase_cache_t self)
   NEW(struct _tile_t,t,1);
   ZERO(struct _tile_t,t,1);
   if(++TILES->sz>=TILES->cap)
-  { TILES->cap=TILES->cap*1.2+50;
+  { TILES->cap=(size_t)(TILES->cap*1.2+50);
     RESIZE(tile_t,TILES->tiles,TILES->cap);
   }
   LASTTILE=t;
@@ -277,7 +286,7 @@ void* pop(tilebase_cache_t self)
 }
 int append_i64 (tilebase_cache_t self, const char* str)
 { if(SEQ_N>=SEQ_CAP)
-  { SEQ_CAP=SEQ_CAP*1.2+50;
+  { SEQ_CAP=(size_t)(SEQ_CAP*1.2+50);
     RESIZE(int64_t,SEQI,SEQ_CAP);
   }
   errno=0;
@@ -290,7 +299,7 @@ Error:
 }
 int append_f64 (tilebase_cache_t self, const char* str)
 { if(SEQ_N>=SEQ_CAP)
-  { SEQ_CAP=SEQ_CAP*1.2+50;
+  { SEQ_CAP=(size_t)(SEQ_CAP*1.2+50);
     RESIZE(double,SEQF,SEQ_CAP);
   }
   errno=0;
@@ -304,8 +313,7 @@ Error:
 void clear(tilebase_cache_t self)       {SEQ_N=0;}
 void release(tilebase_cache_t self)     {if(SEQI) free(SEQI);}
 void *sequence_of_ints(tilebase_cache_t self)
-{ char *e;
-  switch(E_TYPE)
+{ switch(E_TYPE)
   { case YAML_SEQUENCE_START_EVENT: clear(self); return sequence_of_ints;
     case YAML_SEQUENCE_END_EVENT: return pop(self);
     case YAML_SCALAR_EVENT: TRY(append_i64(self,E_VAL)); return sequence_of_ints;
@@ -315,8 +323,7 @@ Error:
   return 0;
 }
 void *sequence_of_floats(tilebase_cache_t self)
-{ char *e;
-  switch(E_TYPE)
+{ switch(E_TYPE)
   { case YAML_SEQUENCE_START_EVENT: clear(self); return sequence_of_floats;
     case YAML_SEQUENCE_END_EVENT: return pop(self);
     case YAML_SCALAR_EVENT: TRY(append_f64(self,E_VAL)); return sequence_of_floats;
@@ -336,7 +343,7 @@ void aabb_shape(tilebase_cache_t self)
 void dims(tilebase_cache_t self)
 { size_t i;
   for(i=0;i<SEQ_N;++i)
-    TRY(ndShapeSet(LASTTILE->shape,i,(size_t)SEQI[i]));
+    TRY(ndShapeSet(LASTTILE->shape,(unsigned int)i,(size_t)SEQI[i]));
   Error:;// pass
 }
 void transform(tilebase_cache_t self)
@@ -501,12 +508,10 @@ Error:
  * \param[in] mode  A string.  Either "r" or "w"
  */
 tilebase_cache_t TileBaseCacheOpen (const char *path, const char *mode)
-{ tilebase_cache_t self;
+{ tilebase_cache_t self=0;
   char fpath[1024]={0},*rpath=0;
   const char fname[]="tilebase.cache.yml";
 
-  NEW(struct _tilebase_cache_t,self,1);
-  ZERO(struct _tilebase_cache_t,self,1);
   strncpy(fpath,path,sizeof(fpath)-1);
   strncat(fpath,PATHSEP,sizeof(fpath)-strlen(fpath)-1);
   strncat(fpath,fname,sizeof(fpath)-strlen(fpath)-1);
@@ -598,6 +603,7 @@ void TileBaseCacheClose(tilebase_cache_t self)
   yaml_event_delete(EVENT);
 Error: // may memory leak if there's an error in this function.
   if(FP) fclose(FP);
+  free(self);
 }
 
 /**

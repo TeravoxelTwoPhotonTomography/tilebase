@@ -3,6 +3,7 @@
  * Usage:
  *   query-name <path> <query>
  */
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "tilebase.h"
 #include "src/cache.h"
@@ -18,6 +19,10 @@
 #define NEW(T,e,N)        TRY((e)=malloc(sizeof(T)*(N)))
 #define ZERO(T,e,N)       memset((e),0,sizeof(T)*(N))
 
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
+
 struct stack_t 
 { int* data;
   int n,sz;
@@ -27,7 +32,7 @@ int push(int v)
 {
 #if 1
   if(stack.n>=(stack.sz-1))
-  { stack.sz=1.2*stack.n+50;
+  { stack.sz=(int)(1.2*stack.n+50);
     TRY(stack.data=realloc(stack.data,stack.sz*sizeof(int)));
   }
   stack.data[stack.n++]=v;

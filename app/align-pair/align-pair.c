@@ -68,6 +68,24 @@ static aabb_t prnAABB(aabb_t aabb)
   return aabb;
 }
 
+/** Makes a new array that is a decimated copy of v.
+    Free's v.
+  */
+nd_t decimate(nd_t v, int factor)
+{ nd_t out=ndunknown(v);
+  unsigned i,n=ndndim(v);
+  if(factor==1) return v;
+  ndPushShape(v);
+  for(i=0;i<n;++i)
+  { out=ndShapeSet(out,i,ndshape(v)[i]/factor);
+    ndstrides(v)[i]*=factor;
+  }  
+  out=ndcopy(ndheap_ip(out),v,0,0);
+  ndPopShape(v);
+  ndfree(v);
+  return out;
+}
+
 /* loads and crops. caller should free returned value. 
 1. transform bbox back to pixel space using the transform specified by tile
 2. use this to determine the shape of the region to read
@@ -82,10 +100,10 @@ nd_t load(tile_t a,aabb_t bbox)
   while(ndndim(sub.shape)>3)
     sub.shape=ndRemoveDim(sub.shape,ndndim(sub.shape)-1);
 Error:
-  return ndconvert_ip(sub.shape,nd_f32);
+  return decimate(ndconvert_ip(sub.shape,nd_f32),1);
 }
 
-nd_t ndthreshold(nd_t m,nd_t a,float v)
+nd_t thresh(nd_t m,nd_t a,float v)
 { uint8_t* restrict mm=(uint8_t*)nddata(m);
   const float* restrict aa=(float*)nddata(a);
   size_t i;
@@ -138,15 +156,17 @@ Add options:
     printf("--- A[B ---\n");
     TRY(va=load(a,TileAABB(b)));
     ndioClose(ndioWrite(ndioOpen("AtoB.h5",NULL,"w"),va));
+    ndioClose(ndioWrite(ndioOpen("AtoB.tif",NULL,"w"),va));
     printf("--- B[A ---\n");
     TRY(vb=load(b,TileAABB(a)));
     ndioClose(ndioWrite(ndioOpen("BtoA.h5",NULL,"w"),vb));
+    ndioClose(ndioWrite(ndioOpen("BtoA.tif",NULL,"w"),vb));
 
     TRY(plan=ndxcorr_make_plan(nd_heap,va,vb,10));
     TRY(out=ndheap(ndnormxcorr_output_shape(plan)));
 
-    TRY(ndthreshold(ma=ndmake_type(va,nd_u8),va,0));
-    TRY(ndthreshold(mb=ndmake_type(vb,nd_u8),vb,0));
+    TRY(thresh(ma=ndmake_type(va,nd_u8),va,0));
+    TRY(thresh(mb=ndmake_type(vb,nd_u8),vb,0));
     ndioClose(ndioWrite(ndioOpen("ma.h5",NULL,"w"),ma));
     ndioClose(ndioWrite(ndioOpen("mb.h5",NULL,"w"),mb));
 

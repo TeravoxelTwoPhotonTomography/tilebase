@@ -11,8 +11,10 @@
 #include "xform.h"
 #include "address.h"
 #include <math.h> //for sqrt
-#include "cuda_runtime.h" // for cudaGetMemInfo
 #include "tictoc.h" // for profiling
+#if HAVE_CUDA
+#include "cuda_runtime.h" // for cudaGetMemInfo
+#endif
 
 #ifdef _MSC_VER
 #define alloca   _alloca
@@ -47,7 +49,7 @@
 #define PROGRESS(...)
 #endif
 
-#ifdef PROFILE_MEMORY
+#if defined(PROFILE_MEMORY) && HAVE_CUDA
 nd_t ndcuda_log(nd_t vol, void *s)
 { unsigned i;
   LOG("NDCUDA ALLOC: %g MB [%llu",ndnbytes(vol)*1e-6,(unsigned long long)ndshape(vol)[0]);
@@ -343,6 +345,7 @@ static unsigned same_shape(nd_t a, nd_t b)
 
 static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
 { 
+#if HAVE_CUDA
   { size_t free,total;
     cudaMemGetInfo(&free,&total);
     LOG("GPU Mem:\t%6.2f free\t%6.2f total\n",free/1e6,total/1e6);
@@ -368,6 +371,7 @@ static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
     ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
   return 1;
+#endif
 Error:
   return 0;
 }
@@ -443,6 +447,7 @@ typedef struct _subdiv_t
 static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace)
 { subdiv_t ctx=0;
   size_t free,total,factor;
+#if HAVE_CUDA
   TRY(ndndim(in)>3); // assume there's a z.
   NEW(struct _subdiv_t,ctx,1);
   ZERO(struct _subdiv_t,ctx,1);
@@ -471,6 +476,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
   ctx->dz_nm=ctx->dz_px*transform[(ndim+2)*2];
   return ctx;
+#endif
 Error:
   return 0;
 }

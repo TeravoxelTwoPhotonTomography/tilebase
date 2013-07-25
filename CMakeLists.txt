@@ -144,7 +144,7 @@ if(GTEST_FOUND AND TEST_SOURCES)
   tilebase_copy_plugins_to_target(test-tilebase)
   add_test(TestTilebase test-tilebase)
   install(TARGETS test-tilebase
-          RUNTIME DESTINATION bin)
+          RUNTIME DESTINATION bin/test)
 endif()
 
 ###############################################################################

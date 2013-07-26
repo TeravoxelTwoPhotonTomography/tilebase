@@ -15,6 +15,11 @@
 #define snprintf _snprintf
 #endif
 
+#if HAVE_CUDA
+#else
+#define cudaSetDevice(...)
+#endif
+
 #define countof(e) (sizeof(e)/sizeof(*e))
 
 #ifdef _MSC_VER

@@ -10,10 +10,16 @@ include_directories(${BOOST_INCLUDE_DIRS})
 
 file(GLOB SRCS src/*.c src/*.cc src/*.h src/*.hh)
 
+set(EXTRA_LIBS)
+if(UNIX AND NOT APPLE)
+  set(EXTRA_LIBS rt) # for tictoc timer
+endif()
+
 set(_target export)
 add_executable(${_target} export.c ${SRCS})
 target_link_libraries(${_target}
   ${BOOST_LIBRARIES}
+  ${EXTRA_LIBS}
   tilebase
   )
 set_target_properties(${_target} PROPERTIES INSTALL_RPATH ${RPATH})

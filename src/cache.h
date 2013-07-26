@@ -16,3 +16,4 @@ char*            TileBaseCacheError(tilebase_cache_t self);
 #ifdef __cplusplus
 } //extern "C"
 #endif
+

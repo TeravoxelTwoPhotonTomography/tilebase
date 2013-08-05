@@ -328,6 +328,7 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format, til
     }
     TRY(isok);
   }
+  if(dir) {closedir(dir); dir=0;}
   
   if(!any) // then it's a leaf
   { tile_t t=0;
@@ -336,6 +337,7 @@ static unsigned addtiles(tiles_t tiles,const char *path, const char* format, til
     if(t) // !!! insufficient?...Tile is lazy, so we don't know it's valid at constuction
       TRYLBL(TileBaseCacheWrite(tiles->cache,path,t),CacheWriteError); // this should be able to handle bad tiles by silently failing.
   }
+
   return 1;
 CacheWriteError:
   pop(tiles);

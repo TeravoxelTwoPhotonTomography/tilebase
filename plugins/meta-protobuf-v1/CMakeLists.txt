@@ -14,6 +14,7 @@ include_directories(${PROJECT_BINARY_DIR})
 
 find_package(PROTOBUF CONFIG PATHS cmake)
 find_package(EIGEN CONFIG PATHS cmake)
+find_package(Threads)
 if(PROTOBUF_FOUND AND EIGEN_FOUND)
   include_directories(${PROTOBUF_INCLUDE_DIR})
   include_directories(${EIGEN_INCLUDE_DIR})
@@ -47,6 +48,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   add_dependencies(meta-protobuf-v1 eigen)
   target_link_libraries(meta-protobuf-v1
     tilebase
+    ${CMAKE_THREAD_LIBS_INIT}
     ${PROTOBUF_LIBRARY})
 
   ##############################################################################

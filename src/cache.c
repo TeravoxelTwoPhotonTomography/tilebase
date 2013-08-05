@@ -581,7 +581,9 @@ Error:
 void TileBaseCacheClose(tilebase_cache_t self)
 { if(!self) return;
   if(self->log)
-    printf("[TileBaseCache]\n\t%s\n",self->log);
+  {  printf("[TileBaseCache]\n\t%s\n",self->log);
+     free(self->log);
+  }
   //else if(self->mode==WRITE)// write the footer if everything is ok
 
   switch(self->mode)

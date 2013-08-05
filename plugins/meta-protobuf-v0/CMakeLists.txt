@@ -16,6 +16,7 @@ find_package(GTEST CONFIG PATHS cmake)
 
 find_package(PROTOBUF CONFIG PATHS cmake)
 find_package(EIGEN CONFIG PATHS cmake)
+find_package(Threads)
 if(PROTOBUF_FOUND AND EIGEN_FOUND)
   include_directories(${PROTOBUF_INCLUDE_DIR})
   include_directories(${EIGEN_INCLUDE_DIR})
@@ -50,6 +51,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   add_dependencies(meta-protobuf-v0 eigen)
   target_link_libraries(meta-protobuf-v0
     tilebase
+    ${CMAKE_THREAD_LIBS_INIT}
     ${PROTOBUF_LIBRARY})
 
 
@@ -79,7 +81,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
     gtest_copy_shared_libraries(test-meta-protobuf-v0)
     add_test(TestMetadataProtobufV0 test-meta-protobuf-v0)
     install(TARGETS test-meta-protobuf-v0
-          RUNTIME DESTINATION bin)
+          RUNTIME DESTINATION bin/test)
   endif()
 
   ##############################################################################

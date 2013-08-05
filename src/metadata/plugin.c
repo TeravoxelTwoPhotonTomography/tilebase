@@ -29,7 +29,8 @@
 
 #define ENDL       "\n"
 #define LOG(...)   fprintf(stderr,__VA_ARGS__)
-#define TRY(e,msg) do{ if(!(e)) {LOG("%s(%d): %s"ENDL "\tExpression evaluated to false."ENDL "\t%s"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e,msg); breakme(); goto Error; }} while(0)
+#define REPORT(msg1,msg2) LOG("%s(%d): %s"ENDL "\tExpression evaluated to false."ENDL "\t%s"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,msg1,msg2)
+#define TRY(e,msg) do{ if(!(e)) {REPORT(#e,msg); breakme(); goto Error; }} while(0)
 #define NEW(type,e,nelem) TRY((e)=(type*)malloc(sizeof(type)*(nelem)),"Memory allocation failed.")
 #define SILENTTRY(e,msg) do{ if(!(e)) { goto SilentError; }} while(0)
 #if 0
@@ -110,7 +111,7 @@ static metadata_api_t* load(const char *path, const char *fname)
   get_metadata_api_t get;
 #ifdef _MSC_VER
   TRY(SetDllDirectory(path),estring());
-  SILENTTRY(lib=LoadLibrary(fname),"There was a problem loading the specified library.");
+  SILENTTRY(lib=LoadLibrary(fname),fname);
   SetDllDirectory(NULL); // reset
 #else
   { char *buf;
@@ -118,7 +119,7 @@ static metadata_api_t* load(const char *path, const char *fname)
     size_t n = strlen(path)+strlen(fname)+2; // one extra for the terminating null
     TRY(buf=(char*)alloca(n),"Out of stack space.");
     cat(buf,n,3,p);
-    SILENTTRY(lib=LoadLibrary(buf),"There was a problem loading the specified library.");
+    SILENTTRY(lib=LoadLibrary(buf),buf);
   }
 #endif
   DBG("[TRY   ] %-20s fname: %s"ENDL,path,fname);
@@ -134,6 +135,7 @@ Finalize:
 Error:
   LOG("\t%s"ENDL "\t%s"ENDL,path,fname);
 SilentError:
+  DBG("[ XXXX ] Failed: %s\n\t%s\n\n",fname,dlerror());
   if(lib) { FreeLibrary((HMODULE)lib); lib=NULL; }
   goto Finalize;
 }
@@ -252,7 +254,7 @@ static int recursive_load(apis_t *apis,DIR* dir,const char *path)
   int is_ok=1;
   struct dirent *ent=0;
   while((ent=readdir(dir))!=NULL)
-  { if(ent->d_type==DT_REG
+  { if(ent->d_type!=DT_DIR
     && is_shared_lib(ent->d_name,strlen(ent->d_name)))
     { TRY(push(apis,load(path,ent->d_name)),"Could not append format API.");
     } else if(ent->d_type==DT_DIR)

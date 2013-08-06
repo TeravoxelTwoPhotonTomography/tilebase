@@ -1,0 +1,27 @@
+package fetch.cfg.worker;
+
+message ResonantWrap
+{ 
+  optional float turn_px = 1 [default = 0.0];
+}
+
+message ResonantUnwarp
+{ 
+  optional float duty = 1 [default = 0.95];
+}
+
+message HorizontalDownsample
+{
+  optional int32 ntimes = 1 [default=1];
+}
+
+message FrameAverage
+{
+  optional int32 ntimes = 1 [default=1];
+}
+
+message Pipeline
+{ optional uint32 frame_average_count = 1 [default=0];
+  optional uint32 downsample_count    = 2 [default=1];
+  optional bool   invert_intensity    = 3 [default=false];
+}

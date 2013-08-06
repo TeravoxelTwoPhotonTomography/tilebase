@@ -77,7 +77,7 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
     gtest_copy_shared_libraries(test-meta-protobuf-v1)
     add_test(TestMetadataProtobufV0 test-meta-protobuf-v1)
     install(TARGETS test-meta-protobuf-v1
-          RUNTIME DESTINATION bin)
+          RUNTIME DESTINATION bin/test)
   endif()
 
   ##############################################################################

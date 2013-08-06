@@ -109,7 +109,7 @@ foreach(PLUGIN ${PLUGINS})
 endforeach(PLUGIN)
 
 ### APPS ###
-add_subdirectory(app/export)
+add_subdirectory(app/render)
 add_subdirectory(app/tilebase-cache-build)
 add_subdirectory(app/query-aabb)
 add_subdirectory(app/query-name)

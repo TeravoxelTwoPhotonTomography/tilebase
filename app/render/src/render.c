@@ -4,6 +4,7 @@
  *
  * \todo refactor to sepererate tree traversal from the rendering bits.
  */
+#include <app/render/config.h>
 #include <stdio.h>
 #include <string.h>
 #include "render.h"

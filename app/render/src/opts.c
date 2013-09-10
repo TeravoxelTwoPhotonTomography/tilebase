@@ -197,7 +197,7 @@ static void set_human_readible_size(const char *s, unsigned *dst) // assumes val
   for(i=0;i<countof(suffixes);++i)
     if(*end==suffixes[i])
       break;
-  *dst=(unsigned) (r*pow(10,3*i));
+  *dst=(unsigned) (r*pow(10,3*(i+1)));
 }
 
 static int  is_double(const char *s)        { char *end=0; strtod(s,&end); return (end!=s); }
@@ -303,7 +303,7 @@ static void writehelp(int maxwidth,const char* lhs,int width,const char* help)
 
   n=maxwidth-width-margin;
 
-  while((h-helpbuf)<r)
+  do
   { int nl=0;  // newline flag - newlines reset the tab stop and preserve leading whitespace on the next line
     int nn=n-((ts>=0)?ts:0);
     char *tp=0;// tab pointer
@@ -333,7 +333,7 @@ static void writehelp(int maxwidth,const char* lhs,int width,const char* help)
     } else
     { ts=-1; // reset the tab stop on a newline
     }
-  }
+  } while((h-helpbuf)<r);
 }
 
 static void usage()

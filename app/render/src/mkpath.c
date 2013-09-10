@@ -19,6 +19,7 @@
  #define stat             _stat
  #define chmod            _chmod
  #define umask            _umask
+ #define errno            _errno
 
  #define S_ISDIR(e)       (((e)&_S_IFDIR)!=0)
  #define PATHSEP          '\\'
@@ -59,20 +60,41 @@ Error:
  *
  * \returns 1 on success, 0 otherwise.
  */
-int mkpath(char* path)
+static int mkpath_(char* path)
 { char* p=0;
   int any=0;
   TRY(path && *path);
   for (p=strchr(path+1, PATHSEP); p; p=strchr(p+1, PATHSEP)) 
   { *p='\0';
-    mkdir(path,PERMISSIONS);
+    LOG(path);
+    if(!exists(path))
+    { LOG("DOES NOT EXIST %s\n",path); 
+      TRY((0==mkdir(path,PERMISSIONS)) || errno==EEXIST );
+    }
     *p=PATHSEP; // exists() has trouble with windows path seperators, so switch to unix style
   }
-  mkdir(path,PERMISSIONS);
+  TRY((0==mkdir(path,PERMISSIONS))  || errno==EEXIST );
   TRY(exists(path));
   return 1;
 Error:  
+  perror(path);
   if(p) *p=PATHSEP;   
   perror(path);
   return 0;
+}
+
+#ifdef _MSC_VER
+#define usleep(e) Sleep(e/1000)
+#else
+#include <unistd.h>
+#endif
+
+int mkpath(char* path) // NFS isn't the moist reliable?
+{ int failcount=0;
+  static const int thresh=10;
+  while(!mkpath_(path) && failcount<thresh)
+    { failcount++;
+      usleep(1000*1000); // sleep 1000 ms
+    }
+  return (failcount<thresh);
 }

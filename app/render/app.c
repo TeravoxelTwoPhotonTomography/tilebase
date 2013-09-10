@@ -10,6 +10,7 @@
 #include "src/render.h"
 #include "src/mkpath.h"
 #include "src/fixup.h"
+#include <app/render/config.h>
 
 #ifdef _MSC_VER
 #define snprintf _snprintf

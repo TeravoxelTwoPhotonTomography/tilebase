@@ -53,7 +53,9 @@
 #if defined(PROFILE_MEMORY) && HAVE_CUDA
 nd_t ndcuda_log(nd_t vol, void *s)
 { unsigned i;
-  LOG("NDCUDA ALLOC: %g MB [%llu",ndnbytes(vol)*1e-6,(unsigned long long)ndshape(vol)[0]);
+  int idev;
+  cudaGetDevice(&idev);
+  LOG("NDCUDA ALLOC (Dev: %2d): %g MB [%llu",idev,ndnbytes(vol)*1e-6,(unsigned long long)ndshape(vol)[0]);
   for(i=1; i<ndndim(vol);++i)
     LOG(",%llu",(unsigned long long)ndshape(vol)[i]);
   LOG("]"ENDL);

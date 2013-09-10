@@ -9,6 +9,8 @@
  extern "C" {
 #endif
 
+#include "address.h"
+
 typedef struct _opts_t
 { const char *src;
   const char *dst;
@@ -41,17 +43,7 @@ typedef struct _opts_t
   int gpu_id;
 } opts_t;
 
-extern opts_t OPTS; // Global variable for holding config loaded from parse_args
-
-/**
- * Fills in the opts_t struct, which contains options read from the command
- * line (or possibly a configuration file).  Should only be called once at the
- * beginning of a program.
- *
- * \returns 1 on sucess, 0 otherwise
- */
-unsigned parse_args(int argc, char *argv[]);
-
+opts_t parseargs(int *argc, char** argv[], int *isok);
 
 #ifdef __cplusplus
 } //extern "C" {

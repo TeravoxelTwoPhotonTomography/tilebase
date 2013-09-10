@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "tilebase.h"
+#include "src/opts.h"
 #include "src/address.h"
 #include "src/render.h"
 #include "src/mkpath.h"
-#include "src/opts.h"
 #include "src/fixup.h"
 
 #ifdef _MSC_VER
@@ -29,7 +29,7 @@
 #define PATHSEP  '/'
 #endif
 #define ENDL     "\n"
-#define LOG(...) fprintf(stderr,__VA_ARGS__) 
+#define LOG(...) fprintf(stderr,__VA_ARGS__)
 #define TRY(e)   do{if(!(e)) { DBG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
 //#define DEBUG
@@ -42,6 +42,7 @@
 #define max(a,b)  (((a)<(b))?(b):(a))
 
 int g_flag_loaded_from_tree=0;
+opts_t OPTS={0};
 
 static unsigned print_addr(nd_t v, address_t address, void* args)
 { FILE* fp=args;
@@ -58,7 +59,7 @@ static unsigned print_addr(nd_t v, address_t address, void* args)
 
 unsigned save(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
-       path[1024]={0};  
+       path[1024]={0};
   size_t n;
   //nd_t tmp=0;
   int isok=1;
@@ -82,11 +83,11 @@ Error:
 
 unsigned save_raveler(nd_t vol, address_t address, void* args)
 { char full[1024]={0},
-       path[1024]={0};  
+       path[1024]={0};
   size_t n;
   nd_t tmp=0,tmp2=0;
   int isok=1;
-  
+
   TRY(ndcopy(tmp=ndheap(vol),vol,0,0));
   TRY(ndShapeSet(tmp,3,1));                                   // select first channel
 
@@ -114,13 +115,13 @@ Error:
 
 nd_t load(address_t address)
 { char full[1024]={0},
-       path[1024]={0};  
+       path[1024]={0};
   size_t n;
   nd_t out=0;
   ndio_t f=0;
   g_flag_loaded_from_tree=1;
   TRY(address_to_path(path,countof(path),address));
-  TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);  
+  TRY((n=snprintf(full,countof(full),"%s%c%s",OPTS.dst,PATHSEP,path))>0);
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   printf("LOADING %s"ENDL,full);
 #if 1
@@ -150,10 +151,13 @@ uint64_t nextpow2(uint64_t v)
 }
 
 int main(int argc, char* argv[])
-{ unsigned ecode=0; 
+{ unsigned ecode=0;
   tiles_t tiles=0;
   handler_t on_ready=save;
-  TRY(parse_args(argc,argv));
+  { int isok=0;
+    OPTS=parseargs(&argc,&argv,&isok);
+    TRY(isok);
+  }
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));
@@ -204,11 +208,11 @@ int main(int argc, char* argv[])
     TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL,load,OPTS.target));
     goto Finalize;
   }
-  
+
   TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL));
-  
+
 Finalize:
-  TileBaseClose(tiles); 
+  TileBaseClose(tiles);
 #ifdef _MSC_VER //helps with msvc debugging
   LOG("Press <ENTER>"ENDL); getchar();
 #endif

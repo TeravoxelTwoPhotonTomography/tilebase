@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 project(render)
 
 find_package(EIGEN  CONFIG PATHS cmake)
-find_package(BOOST  CONFIG PATHS cmake)
 
 set(HAVE_CUDA 0)
 find_package(CUDA 4.0)

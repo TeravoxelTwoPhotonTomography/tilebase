@@ -4,7 +4,7 @@
  * TODO
  * - scripting/config file (via lua)
  * - threshold width on long option names
- *   A long option name's lhs should be printed on it's own line and should 
+ *   A long option name's lhs should be printed on it's own line and should
  *   not effect the lhs column width.
  * - maybe change callback type so encountering an option can effect a state transition
  * - Make SPEC and ARGS settable - hence making the option parsing an API
@@ -36,7 +36,7 @@
   #define PATHSEP '/'
 #endif
 
-//-- TYPES --------------------------------------------------------------------- 
+//-- TYPES ---------------------------------------------------------------------
 typedef int  (*validator_t)(const char* s);
 typedef int  (*parse_t)    (opts_t* ctx,const char* s);
 typedef void (*callback_t) (opts_t* ctx);
@@ -50,7 +50,7 @@ typedef struct _opt_t
 { validator_t validate;
   parse_t     parse;
   callback_t  callback;
-  int         is_flag;  
+  int         is_flag;
   const char* shortname;
   const char* longname;
   const char* def; // default
@@ -81,7 +81,7 @@ static int  output(opts_t *ctx,const char *s);
 static int    ARGC;
 static char** ARGV;
 static opt_t SPEC[]=
-{ 
+{
   {NULL,NULL,help,1,"-h","--help",NULL, "Display this help message.",{0}},
   {NULL,NULL,nocorners,1,"-nc","--no-corners",NULL,"Only use neighbors that share a full face.",{0}},
   {NULL,output,NULL,0,"-o","--output",NULL,"Output selected tiles to a the specified file.",{0}},
@@ -140,10 +140,10 @@ static void reporter(const char *file,int line,const char* function,const char*f
 }
 
 /** Prints a two column output where the help string is wrapped in the second
-    column. 
+    column.
 */
 static void writehelp(int maxwidth,const char* lhs,int width,const char* help)
-{ 
+{
   char helpbuf[1024]={0};
   int n,r=(int)strlen(help); // remainder of help text to write
   char t, // temp
@@ -196,14 +196,14 @@ static void usage()
   PRINT("Usage: %s [options]",basename(ARGV[0]));
   for(i=0;i<countof(ARGS);++i)
     PRINT(" <%s>",ARGS[i].name);
-  
+
   for(i=0;i<countof(ARGS);++i)
   { int c=0;
 #define WRITE(...) c+=snprintf(ARGS[i].state.buf+c,sizeof(ARGS[i].state.buf)-c,__VA_ARGS__)
     WRITE("    %s",ARGS[i].name);
 #undef WRITE
   }
-  
+
 
   // left column of help text
   for(i=0;i<countof(SPEC);++i)
@@ -236,12 +236,12 @@ static void usage()
   PRINT("\nOptions:\n");
   for(i=0;i<countof(SPEC);++i)
     writehelp(MAXWIDTH,SPEC[i].state.buf,width,SPEC[i].help);
-  
+
   printf("\n");
 }
 
 static void help(opts_t *opts)
-{ usage(); exit(0); 
+{ usage(); exit(0);
 }
 
 #define CALLBACK(iopt,opts)      if(SPEC[iopt].callback) SPEC[iopt].callback(&opts)
@@ -302,7 +302,7 @@ opts_t parsargs(int *argc, char** argv[], int *isok)
   // fixed place argument handling and sections
 #undef CALLBACK
 #undef VALIDATE
-#undef PARSE  
+#undef PARSE
 #define CALLBACK(iopt,opts)      if(ARGS[iopt].callback) ARGS[iopt].callback(&opts)
 #define VALIDATE(iopt,str)       (ARGS[iopt].validate==NULL || ARGS[iopt].validate(str))
 #define PARSE(iopt,opts,str)     (ARGS[iopt].parse==NULL || ARGS[iopt].parse(&opts,str))

@@ -1,0 +1,230 @@
+scanner3d {
+  scanner2d {
+    frequency_hz: 7920
+    nscans: 128
+    line_duty_cycle: 0.99
+    daq {
+      kind: NIDAQ
+      nidaq {
+        ao_samples_per_waveform: 16384
+        trigger: "APFI0"
+        ctr: "ctr0"
+        armstart: "PFI15"
+        name: "Dev2"
+        level_volts: 0.5
+        flyback_scans: 4
+        frame_trigger_out: "PFI1"
+      }
+    }
+    digitizer {
+      kind: Alazar
+      alazar {
+        system_id: 1
+        sample_rate: SAMPLE_RATE_125MSPS
+        channels {
+          board_id: 0
+          chan_id: CHANNEL_A
+          range: INPUT_RANGE_PM_1_V
+          enabled: true
+        }
+        aux_out_board_id: 1
+      }
+    }
+    pockels {
+      kind: NIDAQ
+      laser: Chameleon
+      name: "Chameleon"
+      calibration {
+        calibrated: true
+        v_zero: 0
+        v_max: 0.75
+      }
+      nidaq {
+        v_lim_max: 2
+        v_lim_min: 0
+        v_open: 0.375
+        v_closed: 0
+        ao_channel: "ao2"
+        ai_channel: "ai16"
+      }
+      simulated {
+      }
+    }
+    pockels {
+      kind: NIDAQ
+      laser: Fianium
+      name: "Fianium (1064nm)"
+      calibration {
+        calibrated: true
+        v_zero: 0
+        v_max: 1.5
+      }
+      nidaq {
+        v_lim_max: 2
+        v_lim_min: 0
+        v_open: 0
+        v_closed: 0
+        ao_channel: "ao3"
+        ai_channel: ""
+      }
+      simulated {
+      }
+    }
+    shutter {
+      kind: NIDAQ
+      nidaq {
+        open: 1
+        closed: 0
+        do_channel: "/Dev2/port0/line8"
+      }
+    }
+    linear_scan_mirror {
+      kind: NIDAQ
+      nidaq {
+        v_lim_max: 10
+        v_lim_min: -10
+        vpp: 20
+        ao_channel: "ao0"
+      }
+    }
+  }
+  zpiezo {
+    kind: NIDAQ
+    nidaq {
+      um2v: 0.025
+      v_lim_max: 12
+      v_lim_min: -3
+      v_offset: 0
+      channel: "ao1"
+    }
+    um_max: 100
+    um_min: 0
+    um_step: 1
+  }
+  zref_um: 0
+}
+stage {
+  kind: C843
+  c843 {
+    id: 1
+    axis {
+      id: 1
+      stage: "M-511.DD_NEW_X"
+    }
+    axis {
+      id: 2
+      stage: "M-511.DD_NEW_Y"
+    }
+    axis {
+      id: 3
+      stage: "M-501.1DG"
+    }
+  }
+  simulated {
+    axis {
+      min_mm: 0
+      max_mm: 100
+    }
+    axis {
+      min_mm: 0
+      max_mm: 100
+    }
+    axis {
+      min_mm: 0
+      max_mm: 12.5
+    }
+  }
+  default_velocity_mm_per_sec {
+    x: 4
+    y: 4
+    z: 1
+  }
+  last_target_mm {
+    x: 85.370811
+    y: 28.855001
+    z: 9.0610008
+  }
+  tilemode: PixelAligned
+  tile_z_offset_mm: 0.16099982988089323
+}
+vibratome {
+  kind: Serial
+  serial {
+    port: "COM4"
+    amplitude: 255
+  }
+  feed_axis: Y
+  feed_vel_mm_per_sec: 1
+  feed_mm: 25
+  geometry {
+    cut_pos_mm {
+      x: 74.998001098632812
+      y: 36.001899719238281
+    }
+    dz_mm: 0.87299633026123047
+  }
+  cut_thickness_um: 50
+}
+fov {
+  x_size_um: 377.2
+  y_size_um: 517.5
+  z_size_um: 100
+  x_overlap_um: 20
+  y_overlap_um: 20
+  z_overlap_um: 50
+  rotation_radians: 0
+}
+pipeline {
+  frame_average_count: 1
+  downsample_count: 16
+  invert_intensity: false
+}
+file_series {
+  root: "z:\\acquisition"
+  date: "2013-09-09"
+  seriesno: 2020
+  pathsep: "\\"
+}
+file_prefix: "ngc"
+stack_extension: ".tif"
+config_extension: ".microscope"
+autotile {
+  z_um: 50
+  maxz_mm: 11
+  timeout_ms: 15000
+  ichan: 0
+  intensity_threshold: 20000
+  area_threshold: 0.10000000149011612
+  search_radius: 3
+  use_adaptive_tiling: true
+}
+surface_probe {
+  kind: NIDAQ
+  nidaq {
+    ai_channel: "/Dev2/ai0"
+    v_min: -10
+    v_max: 10
+  }
+}
+surface_scan {
+  filename: "surface_scan_9-6-13-brain_in_PBS+fulagar.csv"
+  settling_time_ms: 0
+}
+time_series {
+  interval_ms: 60000
+}
+surface_find {
+  backup_frac: 0.8
+  max_backup_um: 150
+  min_um: 0
+  max_um: 100
+  dz_um: 1
+  ichan: 0
+  intensity_threshold: 21000
+  response: 2
+  response_limit_frac: 0.25
+}
+adaptive_tiling {
+  every: 10
+  mindist: 4
+}

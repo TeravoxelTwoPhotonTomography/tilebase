@@ -17,7 +17,7 @@
     )
     add_dependencies(test-meta-protobuf-v4 gtest)
     gtest_copy_shared_libraries(test-meta-protobuf-v4)
-    add_test(TestMetadataProtobufV0 test-meta-protobuf-v4)
+    add_test(TestMetadataProtobufV4 test-meta-protobuf-v4)
     install(TARGETS test-meta-protobuf-v4
           RUNTIME DESTINATION bin/test)
   endif()

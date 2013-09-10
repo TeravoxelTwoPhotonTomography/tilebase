@@ -8,7 +8,7 @@ endmacro()
 ################################################################################
 # CONFIG
 ################################################################################
-set(PBUFV3_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
+set(PBUFV4_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
@@ -24,7 +24,6 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   ##############################################################################
   # SOURCE
   ##############################################################################
-
   file(GLOB SRCS src/*.c src/*.cc)
   file(GLOB HDRS src/*.h src/*.hh)
 
@@ -73,4 +72,4 @@ endif()
 ################################################################################
 #  Documentation
 ################################################################################
-add_subdirectory(doc)
+#add_subdirectory(doc)

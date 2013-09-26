@@ -33,6 +33,7 @@
   #include <malloc.h>
   #define alloca      _alloca
   #define snprintf    _snprintf
+  #define strtoll     _strtoi64
   #define PATHSEP    '\\'
   #define S_ISDIR(B) ((B)&_S_IFDIR)
 #else

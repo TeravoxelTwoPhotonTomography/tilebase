@@ -4,7 +4,7 @@ Parse addresses from export-quadtree and dispatch cluster jobs with the correct
 dependencies.
 
 address     A string like '0' or '1134413' That describes a path to a node in
-            the tree. 0 is the root. 1 is the first child of the root. 12 is the 
+            the tree. 0 is the root. 1 is the first child of the root. 12 is the
             second child of the target-groupfirst child.  etc...
 addresses   An iterable with an address for each element.
 """
@@ -15,7 +15,7 @@ do_only_first_group=0
 disable_qsub=0
 
 ### PYTHON24 ADAPT ###
-def ifthen(predicate,a,b): 
+def ifthen(predicate,a,b):
   if predicate:
     return a
   else:
@@ -23,13 +23,14 @@ def ifthen(predicate,a,b):
 
 ### COMMAND LINE GENERATING FUNCTIONS ###
 
-GROUP_COMMAND=lambda addresses:["python",__file__]+sys.argv[1:]+['--target-group']+addresses
+#GROUP_COMMAND=lambda addresses:["python",__file__]+sys.argv[1:]+['--target-group']+addresses
+GROUP_COMMAND=lambda addresses:["stat /nobackup/mousebrainmicro; python",__file__]+sys.argv[1:]+['--target-group']+addresses #HACK: try to get nobackup to automount
 def QSUB_COMMAND(addresses,holds):
   holdopt=lambda holds: ifthen(holds,['-hold_jid',','.join(map(str,holds))],[])
-  #return 'qsub -terse -V -N clackn-mousebrain-export -j y -o /dev/null -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
-  return 'qsub -terse -V -N clackn-mousebrain-export -j y -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
+  return 'qsub -terse -V -N clackn-mousebrain-export -j y -o /dev/null -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
+  #return 'qsub -terse -V -N clackn-mousebrain-export -j y -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]
 
-def NODE_COMMAND(index,address):  
+def NODE_COMMAND(index,address):
 
   rootcmd=sys.argv[1:sys.argv.index('--target-group')]
   return rootcmd+['--target-address',address,'-gpu',str(index)]
@@ -98,7 +99,7 @@ class _group_scheduler:
       if len(v["items"])<self._n and not k in d:
         key,g=k,v
         break
-    if g is None: #new group      
+    if g is None: #new group
       self._cid+=1
       self._queue[self._cid]={"items":[item],"dependencies":list(set(dependencies)),"ext":list(set([self._cid])|d)}
       return self._cid
@@ -161,7 +162,7 @@ class Job:
   def submit(self,address):
     a=ifthen(address,address,'0') #address if address else '0'
     self._jobid=self._scheduler.submit(a,self._deps());
-    
+
 ### JOBTREE ###
 class JobTree:
   def __init__(self,addresses,scheduler):
@@ -174,7 +175,7 @@ class JobTree:
         t=s._dependencies.get(c,Job(scheduler))
         s._dependencies[c]=t
         s=t
-  def iterjobs(self,address='',job=None): 
+  def iterjobs(self,address='',job=None):
     if not job:
       job=self.tree
     for k,v in job.iteritems():

@@ -10,6 +10,25 @@ function isdir(path,callback) {
   stat(path,function(e,s){if(e) callback(false); else callback(s.isDirectory()); })
 }
 
+var njobs=0;
+
+function throttle(n,cb) {
+  if(njobs<n) {
+    njobs++;
+    cb(function() {njobs--;})
+  } else {
+    setTimeout(function() {throttle(n,cb);},100); // try submitting again in 100 ms
+  }
+}
+
+function submit(cmd,ondone) {
+  console.log('['+njobs+']: '+cmd);
+  var j=spawn('qsub',cmd.trim().split(' '));
+  j.on('exit',ondone); 
+  j.stdout.on('data',function(data) {console.log(data.toString());});
+  j.stderr.on('data',function(data) {console.log(data.toString());});
+}
+
 function walk(src,dst) {
   isdir(src,function(isdir_) {
     if(isdir_) {
@@ -24,10 +43,9 @@ function walk(src,dst) {
       var cmd='-terse -V -N clackn-copy -o /dev/null -j y -b y -l short=true -wd '+process.argv[2]+' cp --parents '+relative(process.argv[2],src)+' '+process.argv[3]
       // log files in script directory
       //var cmd='-terse -V -N clackn-copy -o '+__dirname+' -j y -b y -l short=true -wd '+process.argv[2]+' cp --parents '+relative(process.argv[2],src)+' '+process.argv[3]
-      console.log(cmd)
-      var j=spawn('qsub',cmd.trim().split(' '));
-      j.stdout.on('data',function(data) {console.log(data.toString());});
-      j.stderr.on('data',function(data) {console.log(data.toString());});
+      throttle(10,function(ondone) {
+        submit(cmd,ondone)
+      });
     }
   });
 }

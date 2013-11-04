@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(metadata-protobuf-v6-plugin)
+project(metadata-protobuf-v7-plugin)
 
 macro(show v)
   message("${v} is ${${v}}")
@@ -8,7 +8,7 @@ endmacro()
 ################################################################################
 # CONFIG
 ################################################################################
-set(PBUFV6_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
+set(PBUFV7_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
@@ -43,9 +43,9 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   ##############################################################################
 
   add_definitions(-fPIC)
-  add_library(meta-protobuf-v6 MODULE ${ALL})
-  add_dependencies(meta-protobuf-v6 eigen)
-  target_link_libraries(meta-protobuf-v6
+  add_library(meta-protobuf-v7 MODULE ${ALL})
+  add_dependencies(meta-protobuf-v7 eigen)
+  target_link_libraries(meta-protobuf-v7
     tilebase
     ${CMAKE_THREAD_LIBS_INIT}
     ${PROTOBUF_LIBRARY})
@@ -58,14 +58,14 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   ##############################################################################
   #  Install
   ##############################################################################
-  install(TARGETS meta-protobuf-v6
-    EXPORT meta-protobuf-v6-targets
+  install(TARGETS meta-protobuf-v7
+    EXPORT meta-protobuf-v7-targets
     LIBRARY DESTINATION bin/${TILEBASE_PLUGIN_PATH}
     RUNTIME DESTINATION bin/${TILEBASE_PLUGIN_PATH}
     ARCHIVE DESTINATION lib/${TILEBASE_PLUGIN_PATH}
   )
-  export(TARGETS meta-protobuf-v6 FILE meta-protobuf-v6-targets.cmake)
-  install(EXPORT meta-protobuf-v6-targets DESTINATION cmake)
+  export(TARGETS meta-protobuf-v7 FILE meta-protobuf-v7-targets.cmake)
+  install(EXPORT meta-protobuf-v7-targets DESTINATION cmake)
 
 endif()
 

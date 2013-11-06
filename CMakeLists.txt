@@ -114,6 +114,7 @@ add_subdirectory(app/tilebase-cache-build)
 add_subdirectory(app/query-aabb)
 add_subdirectory(app/query-name)
 add_subdirectory(app/query-neighbors)
+add_subdirectory(app/points)
 #add_subdirectory(app/align-pair) # doesn't work, may never work
 
 ###############################################################################

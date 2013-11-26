@@ -11,7 +11,11 @@
 
 #define countof(e) (sizeof(e)/sizeof(*e))
 
+#if 0
 #define DUMP(name,a) ndioClose(ndioWrite(dst=ndioOpen((name),NULL,"w"),(a)))
+#else
+#define DUMP(name,a)
+#endif
 
 typedef size_t list_node_t;
 

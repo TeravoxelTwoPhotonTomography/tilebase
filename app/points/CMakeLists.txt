@@ -23,9 +23,7 @@ set(_target points)
 add_executable(${_target} main.c ${SRCS})
 target_link_libraries(${_target}
   ${EXTRA_LIBS}
-  # tilebase
-  ## may add tilebase back later so we can reference tiles using
-  ## query-name like functionality
+  tilebase ## brings libnd along
   )
 set_target_properties(${_target} PROPERTIES INSTALL_RPATH ${RPATH})
 tilebase_copy_plugins_to_target(${_target})

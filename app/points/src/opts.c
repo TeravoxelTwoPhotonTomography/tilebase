@@ -108,13 +108,13 @@ static int validate_double(const char* s)
 /** path must exist */
 static int validate_path(const char *path)
 { struct stat s={0};
-  if(stat(path,&s)<0) return 0;
-  return S_ISDIR(s.st_mode);
+  // if(stat(path,&s)<0) return 0; -- will fail for filename patterns used for file series
+  return 1;
 }
 
-static int r1 (opts_t *ctx,const char *s) { ctx->x =strtod(s,NULL); return 1;}
-static int r2 (opts_t *ctx,const char *s) { ctx->y =strtod(s,NULL); return 1;}
-static int thresh (opts_t *ctx,const char *s) { ctx->z =strtod(s,NULL); return 1;}
+static int r1 (opts_t *ctx,const char *s) { ctx->r1 =strtod(s,NULL); return 1;}
+static int r2 (opts_t *ctx,const char *s) { ctx->r2 =strtod(s,NULL); return 1;}
+static int thresh (opts_t *ctx,const char *s) { ctx->thresh =strtod(s,NULL); return 1;}
 static int src(opts_t *ctx,const char *s) {ctx->src=s; return 1;}
 static int dst(opts_t *ctx,const char *s) {ctx->dst=s; return 1;}
 
@@ -245,7 +245,7 @@ static void help()
 
 #define SAME(a,b) ((b!=0)&&strcmp(a,b)==0)
 
-opts_t parsargs(int *argc, char** argv[], int *isok)
+opts_t parseargs(int *argc, char** argv[], int *isok)
 { opts_t opts={0};
   int iarg,iopt;
   unsigned char *hit=0;  // flags to indicate an argv was used in option processing

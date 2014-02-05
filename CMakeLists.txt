@@ -9,7 +9,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
   )
 
 macro(show v)
-  message("${v} is ${${v}}")
+  message(STATUS "${v} is ${${v}}")
 endmacro()
 
 ################################################################################

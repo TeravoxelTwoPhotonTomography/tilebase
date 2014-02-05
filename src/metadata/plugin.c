@@ -45,7 +45,6 @@
 //    Use the dirent (posix) interface for directory traversal.
 #ifdef _MSC_VER
 #include <windows.h>
-#include "Shlwapi.h"                                        // for PathIsRelative()
 #include "dirent.win.h"                                     // use posix-style directory traversal
 const char* estring();
 #else // POSIX

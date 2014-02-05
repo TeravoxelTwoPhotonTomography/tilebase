@@ -159,6 +159,7 @@ int main(int argc, char* argv[])
     OPTS=parseargs(&argc,&argv,&isok);
     TRY(isok);
   }
+  fprintf(stderr,"GPU: %d\n",(int)(OPTS.gpu_id));
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
   TRY(tiles=TileBaseOpen(OPTS.src,OPTS.src_format));

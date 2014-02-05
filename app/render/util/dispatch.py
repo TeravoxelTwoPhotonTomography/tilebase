@@ -24,7 +24,7 @@ def ifthen(predicate,a,b):
 ### COMMAND LINE GENERATING FUNCTIONS ###
 
 #GROUP_COMMAND=lambda addresses:["python",__file__]+sys.argv[1:]+['--target-group']+addresses
-GROUP_COMMAND=lambda addresses:["stat /nobackup/mousebrainmicro; python",__file__]+sys.argv[1:]+['--target-group']+addresses #HACK: try to get nobackup to automount
+GROUP_COMMAND=lambda addresses:["stat /nobackup/mousebrainmicro; umask 002; python",__file__]+sys.argv[1:]+['--target-group']+addresses #HACK: try to get nobackup to automount
 def QSUB_COMMAND(addresses,holds):
   holdopt=lambda holds: ifthen(holds,['-hold_jid',','.join(map(str,holds))],[])
   return 'qsub -terse -V -N clackn-mousebrain-export -j y -o /dev/null -b y -cwd -pe batch 7 -l gpu_nodes'.split()+holdopt(holds)+[' '.join(GROUP_COMMAND(addresses))]

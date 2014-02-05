@@ -456,10 +456,11 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace
   ZERO(struct _subdiv_t,ctx,1);
 #define CEIL(num,den) (((num)+(den)-1)/(den))
   if(!workspace)
-  { cudaMemGetInfo(&free,&total);
+  { TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
     ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
   } else
-  { ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time 
+  { ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time
+  	if(ctx->n==0) ctx->n=1; // just in case an input stack is smaller than the workspace size all of a sudden
   } 
 #undef CEIL
   TRY(ctx->n<ndshape(in)[2]);

@@ -3,7 +3,8 @@ var stat    = require('fs').stat,
     join    = require('path').join,
     relative= require('path').relative,
     mkdirp  = require('mkdirp'),
-    spawn   = require('child_process').spawn;
+    spawn   = require('child_process').spawn,
+    async   = require('async')
 
 function isdir(path,callback) { 
   // callback(bool) - called with true if path is directory, otherwise false.
@@ -29,23 +30,38 @@ function submit(cmd,ondone) {
   j.stderr.on('data',function(data) {console.log(data.toString());});
 }
 
+function mock(cmd,ondone) {
+  console.log(cmd);
+  ondone();
+}
+
 function walk(src,dst) {
   isdir(src,function(isdir_) {
     if(isdir_) {
       readdir(src,function(err,entries) {
         if(err) return;
-        entries.forEach(function(e,i,v) {
-          walk(join(src,e),join(dst,e));
+
+        async.any(entries,
+                  function(e,cb) {isdir(join(src,e),cb);},
+                  function(isbranch) {
+          if(isbranch) { // recursive copy of leaf dir
+            entries.forEach(function(e,i,v) {
+              walk(join(src,e),join(dst,e));
+            });
+          } else {
+            var tgt = relative(process.argv[2],src);
+            var dst = join(process.argv[3],tgt);
+            var out = "dev/null" // __dirname
+            var cmd='-terse -V -N clackn-copy -o '+out+' -j y -b y -l archive=true -wd '+process.argv[2]+' mkdir -p '+dst+' && cp -r '+src+' '+join(dst,'..');
+            throttle(10,function(ondone) {
+              //mock(cmd,ondone);
+              submit(cmd,ondone)
+            });
+          }
         });
       });
     } else {      // file
-      // no log files
-      var cmd='-terse -V -N clackn-copy -o /dev/null -j y -b y -l short=true -wd '+process.argv[2]+' cp --parents '+relative(process.argv[2],src)+' '+process.argv[3]
-      // log files in script directory
-      //var cmd='-terse -V -N clackn-copy -o '+__dirname+' -j y -b y -l short=true -wd '+process.argv[2]+' cp --parents '+relative(process.argv[2],src)+' '+process.argv[3]
-      throttle(10,function(ondone) {
-        submit(cmd,ondone)
-      });
+      console.log("!!! Not Copying: "+src); // get here for cache files in branches
     }
   });
 }
@@ -63,12 +79,3 @@ mkdirp(process.argv[3],function(err) {
   else walk(process.argv[2],process.argv[3]);
 })
 
-/*
-Strategy:
-
-   use: cp --parents  a/b/c dst
-        Copies a/b/c to dst/a/b/c and creates any missing intermediate directories.
-   see: info cp
-        may be gnu specific.  probably won't work on osx, but we don't care.
-
-*/

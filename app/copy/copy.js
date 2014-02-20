@@ -18,7 +18,7 @@ function throttle(n,cb) {
     njobs++;
     cb(function() {njobs--;})
   } else {
-    setTimeout(function() {throttle(n,cb);},100); // try submitting again in 100 ms
+    setTimeout(function() {throttle(n,cb);},3000); // try submitting again in <delay> ms
   }
 }
 

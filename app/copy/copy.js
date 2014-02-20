@@ -13,14 +13,35 @@ function isdir(path,callback) {
 
 var njobs=0;
 
+// throttle # cb calls per second. cb's finish relatively fast.
+// this prevents running out of memory etc
 function throttle(n,cb) {
   if(njobs<n) {
     njobs++;
-    cb(function() {njobs--;})
+    throttle2(10,3000,function() {
+      cb(function() {njobs--;});
+    });
   } else {
-    setTimeout(function() {throttle(n,cb);},3000); // try submitting again in <delay> ms
+    setTimeout(function() {throttle(n,cb);},1000); // try submitting again in <delay> ms
   }
 }
+
+// throttle the number of submissions per second
+var nsubs=0;
+function throttle2(n,delay_ms,cb) {
+  if(nsubs<n) {
+    nsubs++;
+    cb();
+  } else {
+    setTimeout(function() {throttle2(n,delay_ms,cb);},delay_ms);
+  }
+}
+
+setInterval(function() {
+  console.log("ADMITTING");
+  if(nsubs>10) { nsubs-=10; }
+  else         { nsubs=0;}
+},1000);
 
 function submit(cmd,ondone) {
   console.log('['+njobs+']: '+cmd);
@@ -40,7 +61,6 @@ function walk(src,dst) {
     if(isdir_) {
       readdir(src,function(err,entries) {
         if(err) return;
-
         async.any(entries,
                   function(e,cb) {isdir(join(src,e),cb);},
                   function(isbranch) {

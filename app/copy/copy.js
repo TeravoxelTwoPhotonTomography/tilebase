@@ -51,7 +51,7 @@ function walk(src,dst) {
           } else {
             var tgt = relative(process.argv[2],src);
             var dst = join(process.argv[3],tgt);
-            var out = "dev/null" // __dirname
+            var out = "/dev/null" // __dirname
             var cmd='-terse -V -N clackn-copy -o '+out+' -j y -b y -l archive=true -wd '+process.argv[2]+' mkdir -p '+dst+' && cp -r '+src+' '+join(dst,'..');
             throttle(10,function(ondone) {
               //mock(cmd,ondone);

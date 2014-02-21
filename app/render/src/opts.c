@@ -88,6 +88,7 @@ static int  is_positive_int(const char* s);
 
 static void set_print_addresses(opts_t *ctx);
 static void set_raveler_output(opts_t *ctx);
+static void set_output_ortho(opts_t *ctx);
 
 static int  set_address(opts_t *ctx,const char *s); // [ ] TODO
 static int  set_gpu(opts_t *ctx,const char *s); // [ ] TODO
@@ -118,6 +119,7 @@ static opt_t SPEC[]=
   {is_address,      set_address,     NULL,                0, "-t",  "--target-address", NULL,   "Render target address in the tree from it's children.",{0}},
   {is_positive_int, set_gpu,         NULL,                0, "-gpu",NULL,               "0",    "Use this GPU for acceleration.",{0}},
   {NULL,            NULL,            set_raveler_output,  1, "--raveler-output", NULL , NULL,   "Save using raveler format.  WORK IN PROGRESS.  Currently just enforces some constraints.",{0}},
+  {NULL,            NULL,            set_output_ortho,    1, "--ortho", NULL,           NULL,   "Output orthogonal views alongside each node (YZ and ZX).",{0}},
   {NULL,            set_dest_file,   NULL,                0, "-f",  "--dest-file",      "default.%.tif",
         "The file name pattern used to save downsampled volumes.  "
         "Different color channels are saved to different volumes.  "
@@ -240,6 +242,7 @@ static int  set_address(opts_t *ctx,const char *s) // assumes validated
 
 static void set_print_addresses(opts_t *ctx) {ctx->flag_print_addresses=1;}
 static void set_raveler_output(opts_t *ctx)  {ctx->flag_raveler_output=1;}
+static void set_output_ortho(opts_t *ctx)    {ctx->flag_output_ortho=1;}
 static int  set_gpu(opts_t *ctx,const char *s)          {ctx->gpu_id=strtol(s,0,10);                    return 1;}
 static int  set_source_path(opts_t *ctx,const char *s)  {ctx->src=s;                                    return 1;}
 static int  set_output_path(opts_t *ctx,const char *s)  {ctx->dst=s;                                    return 1;}

@@ -73,6 +73,38 @@ unsigned save(nd_t vol, address_t address, void* args)
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   ndioClose(ndioWrite(ndioOpen(full,"series","w"),vol));
+
+  if(OPTS.flag_output_ortho) {
+    nd_t xy=0,yz=0,zx=0;
+    TRY(yz=ndheap(vol));
+    TRY(zx=ndheap(vol));
+    TRY(xy=ndcopy(ndheap(vol),vol,0,0));
+    unsigned d=ndndim(vol);
+    // set everyone to have 3 dims temporarily
+    ndreshape(xy ,3,ndshape(xy));
+    ndreshape(yz ,3,ndshape(yz));
+    ndreshape(zx ,3,ndshape(zx));
+
+    // permute dimensions (copy)
+    TRY(ndshiftdim(yz,xy,1));
+    TRY(ndshiftdim(zx,xy,1));
+
+    // reset everyone to original dimensionality
+    ndreshape(xy ,d,ndshape(xy));
+    ndreshape(yz ,d,ndshape(yz));
+    ndreshape(zx ,d,ndshape(zx));
+
+    // output
+    memset(full+n,0,countof(full)-n);
+    TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"YZ.%.tif"))>0);
+    ndioClose(ndioWrite(ndioOpen(full,"series","w"),yz));
+    ndfree(yz);
+
+    memset(full+n,0,countof(full)-n);
+    TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"ZX.%.tif"))>0);
+    ndioClose(ndioWrite(ndioOpen(full,"series","w"),zx));
+    ndfree(zx);
+  }
 Finalize:
   //ndfree(tmp);
   return isok;

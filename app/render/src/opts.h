@@ -2,8 +2,8 @@
  * \file
  * Program options.
  *
- * Requires address.h included before this file.
  */
+
 #pragma once
 #ifdef __cplusplus
  extern "C" {
@@ -33,6 +33,7 @@ typedef struct _opts_t
   double    fov_x_um; // if <0 use value from tile database, otherwise force fov size on tiles.
   double    fov_y_um;
 
+  unsigned  flag_output_ortho;
 #if 0  // TODO
   unsigned  flag_adjust_contrast;
   double    contrast_min;

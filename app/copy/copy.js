@@ -18,27 +18,34 @@ var njobs=0;
 function throttle(n,cb) {
   if(njobs<n) {
     njobs++;
-    gate(10000,1000,function() {
+    enqueue(function(){
+    //gate(10000,1000,function() {
       cb(function() {njobs--;});
     });
   } else {
-    setTimeout(function() {throttle(n,cb);},5000); // try submitting again in <delay> ms
+    setTimeout(function() {throttle(n,cb);},1000); // try submitting again in <delay> ms
   }
 }
 
 // gate based on number of qstat'd jobs
-function gate(thresh,delay_ms,cb) {
+var queue=[]
+function enqueue(cb) { queue.push(cb); }
+function popn(n) {
+  for(i=0;i<n;++i)
+    if(cb=queue.shift())
+      cb();
+}
+setInterval(function(){
+  var thresh=1000;
   var buf="";
   var p=spawn('./my-job-count.sh');
   p.stdout.on('data',function(data) {buf+=data});
   p.stderr.on('data',function(data) { console.log('ERROR: '+data);});
   p.on('close',function(code) {
-    console.log("Gate: (thresh: "+thresh+") - Jobs: "+buf);
-    if(buf<thresh) {cb();}
-    else { setTimeout(function() {gate(thresh,delay_ms,cb);}); } // try again in delay_ms
+    console.log("Check queue: Size: "+queue.length+" (thresh: "+thresh+") - Jobs: "+buf);
+    if(buf<thresh) {popn(thresh-buf);}
   });
-}
-
+},1000); // check queue once a second
 
 function submit(cmd,ondone) {
   console.log('['+njobs+']: '+cmd);

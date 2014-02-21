@@ -4,7 +4,7 @@ var stat    = require('fs').stat,
     relative= require('path').relative,
     mkdirp  = require('mkdirp'),
     spawn   = require('child_process').spawn,
-    async   = require('async')
+    async   = require('async');
 
 function isdir(path,callback) { 
   // callback(bool) - called with true if path is directory, otherwise false.
@@ -18,30 +18,27 @@ var njobs=0;
 function throttle(n,cb) {
   if(njobs<n) {
     njobs++;
-    throttle2(10,3000,function() {
+    gate(10000,1000,function() {
       cb(function() {njobs--;});
     });
   } else {
-    setTimeout(function() {throttle(n,cb);},1000); // try submitting again in <delay> ms
+    setTimeout(function() {throttle(n,cb);},5000); // try submitting again in <delay> ms
   }
 }
 
-// throttle the number of submissions per second
-var nsubs=0;
-function throttle2(n,delay_ms,cb) {
-  if(nsubs<n) {
-    nsubs++;
-    cb();
-  } else {
-    setTimeout(function() {throttle2(n,delay_ms,cb);},delay_ms);
-  }
+// gate based on number of qstat'd jobs
+function gate(thresh,delay_ms,cb) {
+  var buf="";
+  var p=spawn('./my-job-count.sh');
+  p.stdout.on('data',function(data) {buf+=data});
+  p.stderr.on('data',function(data) { console.log('ERROR: '+data);});
+  p.on('close',function(code) {
+    console.log("Gate: (thresh: "+thresh+") - Jobs: "+buf);
+    if(buf<thresh) {cb();}
+    else { setTimeout(function() {gate(thresh,delay_ms,cb);}); } // try again in delay_ms
+  });
 }
 
-setInterval(function() {
-  console.log("ADMITTING");
-  if(nsubs>10) { nsubs-=10; }
-  else         { nsubs=0;}
-},1000);
 
 function submit(cmd,ondone) {
   console.log('['+njobs+']: '+cmd);

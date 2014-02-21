@@ -78,7 +78,7 @@ unsigned save(nd_t vol, address_t address, void* args)
     nd_t xy=0,yz=0,zx=0;
     TRY(yz=ndheap(vol));
     TRY(zx=ndheap(vol));
-    TRY(xy=ndcopy(ndheap(vol),vol,0,0));
+    TRY(xy=ndcopy(ndheap(vol),vol,0,0)); // force copy to heap; strided copy from gpu doesn't work yet
     unsigned d=ndndim(vol);
     // set everyone to have 3 dims temporarily
     ndreshape(xy ,3,ndshape(xy));
@@ -86,8 +86,8 @@ unsigned save(nd_t vol, address_t address, void* args)
     ndreshape(zx ,3,ndshape(zx));
 
     // permute dimensions (copy)
-    TRY(ndshiftdim(yz,xy,1));
     TRY(ndshiftdim(zx,xy,1));
+    TRY(ndshiftdim(yz,xy,2));
 
     // reset everyone to original dimensionality
     ndreshape(xy ,d,ndshape(xy));

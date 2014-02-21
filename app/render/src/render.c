@@ -619,7 +619,7 @@ static nd_t render_child(desc_t *desc, aabb_t bbox, address_t path)
   else
     out=render_node(desc,bbox,path);
   if(out)
-    TRY(desc->yield(out,path,desc->args));
+    TRY(desc->yield(out,path,bbox,desc->args));
   return out;
 Error:
   return 0;
@@ -634,7 +634,7 @@ static nd_t addr_seq__child(desc_t *desc, aabb_t bbox, address_t path)
   if(!isleaf(desc,bbox))
     render_node(desc,bbox,path);
   if(any_tiles_in_box(TileBaseArray(desc->tiles),TileBaseCount(desc->tiles),bbox)) // cull empty nodes
-    desc->yield(0,path,desc->args);
+    desc->yield(0,path,bbox,desc->args);
   return 0;
 }
 static nd_t addr_seq__compose_child(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace)
@@ -673,7 +673,7 @@ static nd_t target__get_child(desc_t *desc, aabb_t bbox, address_t path)
     }
 
     if(out)
-      TRY(desc->yield(out,path,desc->args));
+      TRY(desc->yield(out,path,bbox,desc->args));
   } else
   { if(!isleaf(desc,bbox))
       render_node(desc,bbox,path);

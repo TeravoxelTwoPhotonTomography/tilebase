@@ -45,7 +45,7 @@
 int g_flag_loaded_from_tree=0;
 opts_t OPTS={0};
 
-static unsigned print_addr(nd_t v, address_t address, void* args)
+static unsigned print_addr(nd_t v, address_t address, aabb_t bbox, void* args)
 { FILE* fp=args;
   char path[1024]={0},*t;
 #ifdef FANCY
@@ -58,10 +58,11 @@ static unsigned print_addr(nd_t v, address_t address, void* args)
   return 0;
 }
 
-unsigned save(nd_t vol, address_t address, void* args)
+unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
 { char full[1024]={0},
        path[1024]={0};
   size_t n;
+  FILE *fp=0; // for transform.txt
   //nd_t tmp=0;
   int isok=1;
   //TRY(ndcopy(tmp=ndheap(vol),vol,0,0));
@@ -74,6 +75,25 @@ unsigned save(nd_t vol, address_t address, void* args)
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   ndioClose(ndioWrite(ndioOpen(full,"series","w"),vol));
 
+  // output text document with origin and scale
+  if(bbox)
+  { int64_t *o,*s;
+    int i;
+    char *lbls[] = {"ox","oy","oz","sx","sy","sz"};
+
+    memset(full+n,0,countof(full)-n);
+    TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"transform.txt"))>0);
+    TRY(fp=fopen(full,"w"));
+    
+    TRY(AABBGet(bbox,0,&o,&s));
+    for(i=0;i<3;++i) // translation
+      fprintf(fp,"%s: %lld\n",lbls[i],(long long)o[i]);
+    for(i=0;i<3;++i) // scale:: r_nm = s * r_px
+      fprintf(fp,"%s: %f\n",lbls[i+3],(double)s[i]/(double)ndshape(vol)[i]);
+    fclose(fp); fp=0;
+  }
+
+  // optionally output orthogonal views
   if(OPTS.flag_output_ortho) {
     nd_t xy=0,yz=0,zx=0;
     TRY(yz=ndheap(vol));
@@ -107,6 +127,7 @@ unsigned save(nd_t vol, address_t address, void* args)
   }
 Finalize:
   //ndfree(tmp);
+  if(!fp) fclose(fp);
   return isok;
 Error:
   isok=0;
@@ -114,7 +135,7 @@ Error:
 }
 
 
-unsigned save_raveler(nd_t vol, address_t address, void* args)
+unsigned save_raveler(nd_t vol, address_t address, aabb_t bbox, void* args)
 { char full[1024]={0},
        path[1024]={0};
   size_t n;
@@ -238,7 +259,7 @@ int main(int argc, char* argv[])
 
   if(OPTS.target)
   { printf("RENDERING TARGET: ");
-    print_addr(0,OPTS.target,stdout);
+    print_addr(0,OPTS.target,0,stdout);
     TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL,load,OPTS.target));
     goto Finalize;
   }

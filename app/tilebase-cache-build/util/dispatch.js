@@ -30,7 +30,9 @@ function qsubjob(cmd)
 { return function (path,args,callback)
   { var hold = function (holds) { return ((args&&args.length)?(' -hold_jid '+args):' ') } 
     console.log('DO '+path+'\tHOLD '+hold(args));
-    var thing=('-terse -V -N clackn-tilebase-cache -o /dev/null -j y -b y -l short=true -cwd'+hold(args)).trim().split(' ');
+    var log='/dev/null';
+    //var thing=('-terse -V -N clackn-tilebase-cache -o '+log+' -j y -b y -l short=true -cwd'+hold(args)).trim().split(' ');
+    var thing=('-terse -V -N clackn-tilebase-cache -o '+log+' -j y -b y -cwd'+hold(args)).trim().split(' ');
     thing.push(cmd+' '+path);
     var j=spawn('qsub',thing);
     j.stdout.on('data',function(data)
@@ -55,5 +57,5 @@ if(process.argv.length!=4)
 { console.log('Usage : node '+__filename+' <task> <rootpath>');
   process.exit(0);
 }
-walk(normalize(process.argv[3]),qsubjob(process.argv[2]))
+walk(normalize(process.argv[3]),qsubjob("stat /nobackup/mousebrainmicro && "+process.argv[2]))
 

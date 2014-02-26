@@ -127,7 +127,7 @@ unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
   }
 Finalize:
   //ndfree(tmp);
-  if(!fp) fclose(fp);
+  if(fp) fclose(fp);
   return isok;
 Error:
   isok=0;

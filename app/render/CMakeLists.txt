@@ -33,4 +33,4 @@ tilebase_copy_plugins_to_target(render)
 nd_copy_plugins_to_target(render ${ND_PLUGINS})
 install(TARGETS ${_target} RUNTIME DESTINATION bin)
 
-install(DIRECTORY util/ DESTINATION scripts/render)
+install(DIRECTORY util/ DESTINATION scripts/render USE_SOURCE_PERMISSIONS)

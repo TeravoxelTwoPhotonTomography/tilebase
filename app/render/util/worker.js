@@ -15,12 +15,14 @@
 var spawn = require('child_process').spawn,
     map   = require('async').map;
 
+var RENDER='/groups/mousebrainmicro/mousebrainmicro/Software/env/gpu/bin/render';
+
 var batch={
   addrs:process.argv[2],
-    cmd:process.argv.slice(3)
+    cmd:process.argv.slice(4)
 };
 var log={stdout:{},stderr:{}};
-
+batch.cmd.unshift(RENDER);
 var bs=batch.addrs.split(',');
 map(bs,
     function(addr,ret) {
@@ -40,7 +42,3 @@ map(bs,
       console.log('BATCH DONE');
     }
 );
-
-
-    
-

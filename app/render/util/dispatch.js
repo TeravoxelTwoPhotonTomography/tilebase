@@ -1,15 +1,4 @@
 #!/bin/env node
-/* 
-   TODO
-
-   [x] mock: ensure dependencies between batched jobs are correct
-   [x] assemble batch command submission
-       [x] FIXME: exec is not serializing as desired
-   [x] write batch command.  test.
-   [ ] throttle
-   [ ] scale
-
-*/
 
 // --- prelude --- 
 
@@ -150,7 +139,7 @@ function popn(n) {
       cb();
 }
 var poll=setInterval(function(){
-  var thresh=200;
+  var thresh=1000;
   var buf="";
   var p=spawn(path.join(__dirname,'my-job-count.sh'));
   p.stdout.on('data',function(data) {buf+=data});
@@ -170,11 +159,11 @@ function qsubopts(name,log,nbatch,addrs,holds) {
   console.log("QSUBOPTS: holds: "+holds);
   if(holds.length)
     holdopt='-hold_jid '+holds.join(',');
-  return ('-terse -V -N '+name+' -j y -o '+log+' -b y -cwd -pe batch '+nbatch+' -l gpu=true '+holdopt).trim().split(' ').concat([batchcmd]);
+  return ('-terse -V -N '+name+' -j y -o '+log+' -b y -cwd -pe batch '+nbatch+' -l gpu_nodes=true '+holdopt).trim().split(' ').concat([batchcmd]);
 }
 
 function qsub(addrs,holds,ret) {
-  QSUB(qsubopts('clackn-render','/dev/null/',7,addrs,holds),function(r) {console.log(r); ret(null,r);});
+  QSUB(qsubopts('clackn-render','log2/',7,addrs,holds),function(r) {console.log(r); ret(null,r);});
 }
 
 var njobs=0;

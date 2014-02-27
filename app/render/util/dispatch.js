@@ -1,17 +1,18 @@
 #!/bin/env node
-// !!! TODO: TEST -- ASSUMING foldl operates in series (no parallel divide and conquer)
-
 /* 
    TODO
 
    [x] mock: ensure dependencies between batched jobs are correct
    [x] assemble batch command submission
        [x] FIXME: exec is not serializing as desired
-   [ ] write batch command.  test.
+   [x] write batch command.  test.
    [ ] throttle
    [ ] scale
 
 */
+
+// --- prelude --- 
+
 var spawn = require('child_process').spawn,
     map   = require('async').map,
     series= require('async').series,
@@ -26,6 +27,8 @@ function unique() {
   },[]);
 }
 
+// --- scheduling ---
+
 function group_by_depth(addrs,cb) {
   function batch(xs,n){
     var t,r=[];
@@ -36,7 +39,7 @@ function group_by_depth(addrs,cb) {
 
   var d={};
   map(Object.keys(addrs),
-      function(v,ret) {var k=v.length;if(!d[k]) {d[k]=[v];} else {d[k].push(v);} ret();},
+      function(v,ret) {var k=v.length;if(v=='0') k=0; if(!d[k]) {d[k]=[v];} else {d[k].push(v);} ret();},
       function() {
         var g={};
         map(Object.keys(d),
@@ -76,6 +79,9 @@ function addresses(cmd,cb) {
                             when done.
   ret   function(err,value) A callback that will be called when the entire series
                             is finished.
+
+  NOTE: I'm not strictly sure this was necessary.  foldl might have worked fine.
+        This gaurantees the approach since it uses series.
 */
 function foreach(xs,f,ret) {
   map(xs,
@@ -109,29 +115,54 @@ function exec(batches,jobs,submit,cb) {
             foreach(batches[d],
                     function(addrs,retb) {
                       console.log({batch:addrs});
-                      //1 : aggregate existing holds for addresses
-                      foldl(addrs,[],
+                      foldl(addrs,[],           //1 : aggregate existing holds for addresses
                           function(holds,addr,ret) {
                             ret(null,holds.concat(jobs[addr].holds))
                           },
-                          function(err,holds) {
-                            //2 : submit jobs
-                            submit(addrs,holds.unique(),function(err,jid){
-                              //3 : update parents (if any)
-                              var i,p;
-                              for(i=0;i<addrs.length;++i)
-                                if((p=jobs[addrs[i]].parent)!=null)
-                                  jobs[p].holds.push(jid);
-                              retb();
+                          function(err,holds) { //2 : submit jobs
+                            enqueue(function(){
+                              submit(addrs,holds.unique(),function(err,jid){
+                                var i,p;        //3 : update parents (if any)
+                                for(i=0;i<addrs.length;++i)
+                                  if((p=jobs[addrs[i]].parent)!=null)
+                                    jobs[p].holds.push(jid);
+                                retb();
+                              });
                             });
                           }
                       );
                     },
                     retd);
           },
-          function() {cb();}
+          function() {stopQstatPolling(); cb();}
          );
 }
+
+// --- throttle ---
+// gate based on number of qstat'd jobs
+// b.c. of the way scheduling is serialized here, there's only 1 job in the internal queue at any time.
+
+var queue=[]
+function enqueue(cb) { queue.push(cb); }
+function popn(n) {
+  for(i=0;i<Math.min(n,queue.length);++i)
+    if(cb=queue.shift())
+      cb();
+}
+var poll=setInterval(function(){
+  var thresh=200;
+  var buf="";
+  var p=spawn(path.join(__dirname,'my-job-count.sh'));
+  p.stdout.on('data',function(data) {buf+=data});
+  p.stderr.on('data',function(data) { console.log('ERROR: '+data);});
+  p.on('close',function(code) {
+    console.log("Check queue: Size: "+queue.length+" (thresh: "+thresh+") - Jobs: "+buf);
+    if(buf<thresh) {popn(thresh-buf);}
+  });
+},100); // check queue once every 5 seconds
+function stopQstatPolling() {clearTimeout(poll);}
+
+// --- job submission ---
 
 function qsubopts(name,log,nbatch,addrs,holds) {
   var holdopt='';
@@ -143,7 +174,7 @@ function qsubopts(name,log,nbatch,addrs,holds) {
 }
 
 function qsub(addrs,holds,ret) {
-  QSUB(qsubopts('clackn-render','log/',7,addrs,holds),function(r) {console.log(r); ret(null,r);});
+  QSUB(qsubopts('clackn-render','/dev/null/',7,addrs,holds),function(r) {console.log(r); ret(null,r);});
 }
 
 var njobs=0;
@@ -158,14 +189,14 @@ function QSUB(opts,on_jid) {
   njobs++;
 }
 
-// MAIN ----------------------------
+// --- MAIN ---
 
 // callback needs to be function(batches,jobs)
 addresses(process.argv.slice(2),function(batches,jobs) {
   exec(batches,jobs,qsub,function() {console.log('DONE');});
 });
 
-// FOR TESTING/DEBUGGING
+// --- test/debug ---
 
 var mock_jid=0;
 function mock(addrs,holds,ret){
@@ -176,7 +207,7 @@ function mock(addrs,holds,ret){
 }
 function mockqsub(addrs,holds,ret) {
   setTimeout(function(){
-    console.log('qsub '+qsubopts('mbm-render','log/',7,addrs,holds));
+    console.log('qsub '+qsubopts('mbm-render','log2/',7,addrs,holds));
     ret(null,mock_jid++);
   },100);
 }

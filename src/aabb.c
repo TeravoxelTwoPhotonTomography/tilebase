@@ -200,9 +200,14 @@ aabb_t AABBBinarySubdivision(aabb_t *out, unsigned n, aabb_t a)
   { unsigned d;
     for(d=0;d<a->ndim;++d)
     { if(BIT(n-1,d))   // should subdivide this dim?
-      { out[i]->shape[d]/=2;
+      { int64_t rem,h,s=out[i]->shape[d];
+        h=s/2;
+        rem=s-2*h;
+        out[i]->shape[d]=h;
         if(BIT(i,d)) // should shift this dim?
-          out[i]->ori[d]+=out[i]->shape[d];
+        { out[i]->ori[d]+=h;
+          out[i]->shape[d]+=rem; // correct for remainder
+        }
       }
     }
   }

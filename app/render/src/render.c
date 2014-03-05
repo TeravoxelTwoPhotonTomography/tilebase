@@ -455,13 +455,17 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace
   NEW(struct _subdiv_t,ctx,1);
   ZERO(struct _subdiv_t,ctx,1);
 #define CEIL(num,den) (((num)+(den)-1)/(den))
-  if(!workspace)
-  { TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
-    ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
-  } else
-  { ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time
-  	if(ctx->n==0) ctx->n=1; // just in case an input stack is smaller than the workspace size all of a sudden
-  } 
+  
+//if(!workspace)
+//{ 
+//  TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
+//  ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
+//} else
+//{ ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time
+//	if(ctx->n==0) ctx->n=1; // just in case an input stack is smaller than the workspace size all of a sudden
+//} 
+  TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
+  ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
 #undef CEIL
   TRY(ctx->n<ndshape(in)[2]);
   ctx->transform=transform;
@@ -496,8 +500,11 @@ static float* subdiv_xform(subdiv_t ctx)   {return ctx->transform;}
 static int  next_subdivision(subdiv_t ctx)
 { if(++ctx->i<ctx->n)
   { TRY(ctx->n>1); // sanity check..remove once confirmed
-    if((ctx->i+1)*ctx->dz_px>ctx->zmax) // adjust last block if necessary
-      ndshape(ctx->carray)[2]=ctx->zmax-ctx->i*ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
+    if((ctx->i+1)*ctx->dz_px>ctx->zmax) {// adjust last block if necessary 
+      int z=ctx->zmax-ctx->i*ctx->dz_px;
+      if(z<=0) return 0; // wtf
+      ndshape(ctx->carray)[2]=z; // don't adjust strides, will get copied to a correctly formatted array on the gpu
+    }
     ndoffset(ctx->carray,2,ctx->dz_px);
     ctx->transform[(ctx->d+1)*2+ctx->d]+=ctx->dz_nm;
     return 1;

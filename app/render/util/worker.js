@@ -30,7 +30,7 @@ map(bs,
       var cmd=batch.cmd.concat(['-gpu',idx,'--target-address',addr]);
       var p=spawn(cmd[0],cmd.slice(1),{cwd:process.cwd()});
       var isdone=0;
-      function done() { if(!isdone) {isdone=1; ret();}}
+      function done() { if(!isdone) {isdone=1; hostname(ret);}}
       log.stdout[addr]='';
       log.stderr[addr]='';
       p.on('exit',function(code) {console.log(log.stdout[addr]); console.error(log.stderr[addr]);done();});
@@ -42,3 +42,14 @@ map(bs,
       console.log('BATCH DONE');
     }
 );
+
+function hostname(cb) {
+  var buf='';
+  var isdone=0;
+  var done=function() {if(!isdone) {isdone=1; cb();}};
+  var p=spawn('hostname');
+  p.stdout.on('data',function(data) {buf+=data;});
+  p.stderr.on('data',function(data) {buf+=data;});
+  p.on('close',function(code) {console.log('HOSTNAME: '+ buf); done()});
+  p.on('error',function(error) {console.log('HOSTNAME: Error - ' + {code:code, buf:buf}); done()});
+}

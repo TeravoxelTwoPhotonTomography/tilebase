@@ -1,0 +1,2 @@
+- would be nice if it checked to see if the data already existed at the destination.
+- timer object should be deleted when everything is all done so that the copy process quits

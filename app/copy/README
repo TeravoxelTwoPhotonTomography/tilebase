@@ -1,0 +1,20 @@
+Usage:
+
+  node copy.js         <source directory> <destination directory>
+  node copy_archive.js <source directory> <destination directory>
+
+Description:
+
+  Distributes cluster jobs to copy the contents of the leaf directories from
+  the source directory tree into the destiation.  Destination directories will
+  be created as neccessary.
+
+  Job submission is throttled in order to avoid qsub queue limits.
+
+  Currently, the script must be manually terminated (using <Ctrl-C>); it does
+  not react when it is done submitting jobs and continues to inquire about the
+  queue length indefinitely.  This could be fixed...
+
+  The "copy_archive" version uses the -l archive=true submission flag (see
+  qsub documentation on the Janelia Wiki).  This restricts to a subset of
+  cluster nodes that have access to the archive network share.

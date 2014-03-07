@@ -36,7 +36,7 @@ function popn(n) {
       cb();
 }
 setInterval(function(){
-  var thresh=1000;
+  var thresh=5000;
   var buf="";
   var p=spawn('./my-job-count.sh');
   p.stdout.on('data',function(data) {buf+=data});

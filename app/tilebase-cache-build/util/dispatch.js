@@ -1,3 +1,4 @@
+#!/bin/env node
 var readdir   = require('fs').readdir,
     stat      = require('fs').stat,
     join      = require('path').join,
@@ -57,5 +58,6 @@ if(process.argv.length!=4)
 { console.log('Usage : node '+__filename+' <task> <rootpath>');
   process.exit(0);
 }
-walk(normalize(process.argv[3]),qsubjob("stat /nobackup/mousebrainmicro && "+process.argv[2]))
+walk(normalize(process.argv[3]),
+     qsubjob("umask 002 && stat /nobackup/mousebrainmicro && "+process.argv[2]))
 

@@ -469,13 +469,20 @@ opts_t parseargs(int *argc, char** argv[], int *isok)
     { LOG("\tPositional argument parse error.\n\tArgument <%s> got \"%s\".\n",ARGS[iopt].name,argv[0][iarg]);
       goto Error;
     }
+    hit[iarg]=1;
     ARGS[iopt++].state.is_found=1;
   }
   // The specified fixed place args must be found
-  // Not too worried about extra args
   for(iopt=0;iopt<countof(ARGS);++iopt)
   { if(!ARGS[iopt].state.is_found)
     { LOG("\tMissing required positional argument <%s>.\n",ARGS[iopt].name);
+      goto Error;
+    }
+  }
+  // any extra args is a problem (user probably mistyped something)
+  for(iarg=1;iarg<*argc;++iarg) 
+  { if(!hit[iarg])  
+    { LOG("\tUnrecognized argument \"%s\"\n",argv[0][iarg]);
       goto Error;
     }
   }

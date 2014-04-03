@@ -163,7 +163,9 @@ function qsubopts(name,log,nbatch,addrs,holds) {
 }
 
 function qsub(addrs,holds,ret) {
-  QSUB(qsubopts('clackn-render','log2/',7,addrs,holds),function(r) {console.log(r); ret(null,r);});
+  var d=new Date()
+  var log=path.join('log', d.toDateString().split(' ').reverse().join('-')+'.txt');
+  QSUB(qsubopts('mbm-render',log,7,addrs,holds),function(r) {console.log(r); ret(null,r);});
 }
 
 var njobs=0;

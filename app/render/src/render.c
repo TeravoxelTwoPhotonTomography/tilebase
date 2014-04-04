@@ -447,24 +447,15 @@ typedef struct _subdiv_t
   float *transform;
   nd_t   carray;
 } *subdiv_t;
-static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace)
+static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,size_t total)
 { subdiv_t ctx=0;
-  size_t free,total,factor;
 #if HAVE_CUDA
   TRY(ndndim(in)>3); // assume there's a z.
   NEW(struct _subdiv_t,ctx,1);
   ZERO(struct _subdiv_t,ctx,1);
 #define CEIL(num,den) (((num)+(den)-1)/(den))
   
-//if(!workspace)
-//{ 
-//  TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
-//  ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
-//} else
-//{ ctx->n=ndshape(in)[2]/ndshape(workspace)[2]; // want floor this time
-//	if(ctx->n==0) ctx->n=1; // just in case an input stack is smaller than the workspace size all of a sudden
-//} 
-  TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
+ // TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
   ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
 #undef CEIL
   TRY(ctx->n<ndshape(in)[2]);
@@ -480,7 +471,8 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim, nd_t workspace
                   ndref(ndinit(),nddata(in),ndkind(in)),
                   ndtype(in)),
                 ndndim(in),ndshape(in)));
-  ctx->dz_px=1+ndshape(ctx->carray)[2]/ctx->n; // make blocks big enough to account for rounding errors, last block will be small
+  ctx->dz_px=ndshape(ctx->carray)[2]/ctx->n;        // max size of each block.
+  ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
   ctx->dz_nm=ctx->dz_px*transform[(ndim+2)*2];
   return ctx;
@@ -521,6 +513,10 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   size_t i;
   tile_t *tiles;
   subdiv_t subdiv=0;
+  size_t free=0,total=0;
+#if HAVE_CUDA
+  TRY(cudaSuccess==cudaMemGetInfo(&free,&total)); 
+#endif
   TRY(tiles=TileBaseArray(desc->tiles));
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
@@ -545,19 +541,22 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
-    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->fws.gpu[0]));
+    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),free,total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
       TIME(TRY(t=aafilt(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
       TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
     } while(next_subdivision(subdiv));
+    free_subdiv(subdiv);
+    subdiv=0;
   }
 Finalize:
   PROGRESS(ENDL);
-  free_subdiv(subdiv);
   ndfree(in);
   return out;
 Error:
+  free_subdiv(subdiv);
+  subdiv=0;
   release_vol(desc,out);
   out=0;
   goto Finalize;

@@ -514,9 +514,6 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   tile_t *tiles;
   subdiv_t subdiv=0;
   size_t free=0,total=0;
-#if HAVE_CUDA
-  TRY(cudaSuccess==cudaMemGetInfo(&free,&total)); 
-#endif
   TRY(tiles=TileBaseArray(desc->tiles));
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
@@ -531,6 +528,9 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
       NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
       TRY(set_ref_shape(desc,in));
        affine_workspace__set_boundary_value(&desc->aws,in);
+#if HAVE_CUDA
+      TRY(cudaSuccess==cudaMemGetInfo(&free,&total)); 
+#endif
     } 
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
     { nd_t s=TileShape(tiles[i]);

@@ -1,0 +1,2 @@
+#define PBUFV8_TEST_DATA_PATH  "@PBUFV8_TEST_DATA_PATH@"
+#define ND_ROOT_DIR            "@ND_ROOT_DIR@"

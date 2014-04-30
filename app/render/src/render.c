@@ -121,6 +121,7 @@ struct _desc_t
   filter_workspace fws;
   affine_workspace aws;
   float *transform;
+  size_t free,total;
 
   /* INTERFACE */
   /* Returns an array that fills the bounding box \a bbox that corresponds to 
@@ -442,8 +443,9 @@ static int any_tiles_in_box(tile_t *tiles, size_t ntiles, aabb_t bbox)
    Division is linearly spaced on z.
 */
 typedef struct _subdiv_t
-{ int i,n,d;
-  int64_t dz_nm,dz_px,zmax;
+{ int i,n,d;      // i is subdiv index, n is number of subdivs, d is dimension of input
+  int64_t dz_px,zmax;
+  int64_t *dz_nm; // displacement vector for each slice
   float *transform;
   nd_t   carray;
 } *subdiv_t;
@@ -459,7 +461,9 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
   ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
 #undef CEIL
   TRY(ctx->n<ndshape(in)[2]);
-  ctx->transform=transform;
+
+  ctx->transform=(float*)malloc((ndim+1)*(ndim+1)*sizeof(float));
+  memcpy(ctx->transform,transform,(ndim+1)*(ndim+1)*sizeof(float));
   ctx->d=ndim;
   ctx->zmax =ndshape(in)[2];
   if(ctx->n==1) // nothing to do - single iteration
@@ -474,7 +478,13 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
   ctx->dz_px=ndshape(ctx->carray)[2]/ctx->n;        // max size of each block.
   ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
-  ctx->dz_nm=ctx->dz_px*transform[(ndim+2)*2];
+  LOG("\t%5s: %10d\n" "\t%5s: %10d\n","n",(int)ctx->n,"dz_px",(int)ctx->dz_px);
+  { 
+    int r,c;
+    ctx->dz_nm=(int64_t*)calloc(ndim+1,sizeof(int64_t));
+    for(r=0;r<(ndim+1);++r)      
+      ctx->dz_nm[r]=ctx->dz_px*transform[(ndim+1)*r+2];
+  }
   return ctx;
 #endif
 Error:
@@ -484,6 +494,8 @@ static void free_subdiv(subdiv_t ctx)
 { if(ctx)
   { if(ctx->n>1)
       ndfree(ndref(ctx->carray,0,nd_unknown_kind));
+    free(ctx->transform);
+    free(ctx->dz_nm);
     free(ctx);
   }
 };
@@ -498,7 +510,11 @@ static int  next_subdivision(subdiv_t ctx)
       ndshape(ctx->carray)[2]=z; // don't adjust strides, will get copied to a correctly formatted array on the gpu
     }
     ndoffset(ctx->carray,2,ctx->dz_px);
-    ctx->transform[(ctx->d+1)*2+ctx->d]+=ctx->dz_nm;
+    { int i;
+      const int n=ctx->d+1;
+      for(i=0;i<n;++i)
+        ctx->transform[n*i+(n-1)]+=ctx->dz_nm[i];
+    }
     return 1;
   }
 Error:
@@ -513,7 +529,6 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   size_t i;
   tile_t *tiles;
   subdiv_t subdiv=0;
-  size_t free=0,total=0;
   TRY(tiles=TileBaseArray(desc->tiles));
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
@@ -522,14 +537,16 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     // Wait to init until a hit is confirmed.
     if(!in)                                                                     // Alloc on first iteration: in, transform
     { unsigned n;
-      in=ndioShape(TileFile(tiles[i]));
-      TRY(ndref(in,malloc(ndnbytes(in)),nd_heap));
+      in=ndheap(TileShape(tiles[i]));
       n=ndndim(in);
-      NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
+      if(!desc->transform)
+        NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
       TRY(set_ref_shape(desc,in));
-       affine_workspace__set_boundary_value(&desc->aws,in);
+      affine_workspace__set_boundary_value(&desc->aws,in);
 #if HAVE_CUDA
-      TRY(cudaSuccess==cudaMemGetInfo(&free,&total)); 
+
+      if(desc->total==0)
+        TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total)); 
 #endif
     } 
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
@@ -541,7 +558,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
-    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),free,total));
+    TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
       TIME(TRY(t=aafilt(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
@@ -549,7 +566,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     } while(next_subdivision(subdiv));
     free_subdiv(subdiv);
     subdiv=0;
-  }
+  } // end loop over tiles
 Finalize:
   PROGRESS(ENDL);
   ndfree(in);

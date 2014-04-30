@@ -53,9 +53,9 @@ using namespace std;
 #ifdef _MSC_VER
  #define open  _open
  #define close _close
- #define PATHSEP '\\'
+ #define PATHSEP "\\"
 #else
- #define PATHSEP '/'
+ #define PATHSEP "/"
 #endif
 /// @endcond
 
@@ -192,7 +192,7 @@ char* find(char* out,size_t n, const char* path, const char *ext)
   TRYMSG(dir=opendir(path),strerror(errno));
   while((ent=readdir(dir)))
   { if((r=strrchr(ent->d_name,'.')) && strcmp(r,ext)==0)
-    { const char *s[]={path,"/",ent->d_name};
+    { const char *s[]={path,PATHSEP,ent->d_name};
       cat(out,n,countof(s),s);
       break;
     }
@@ -234,7 +234,7 @@ Error:
 static
 void getWriteTarget(char* out, size_t n,const char* path, const char* ext, const char* default_prefix)
 { if(!find(out,n,path,ext))
-  { const char *p[]={path,"/",default_prefix,ext};
+  { const char *p[]={path,PATHSEP,default_prefix,ext};
     cat(out,sizeof(out),countof(p),p);
   }
 }
@@ -279,7 +279,7 @@ const char* pbufv8_name()
  * Just checks for the existence of the expected files at \a path.
  */
 unsigned pbufv8_is_fmt(const char* path, const char* mode)
-{ char name[1024];
+{ char name[1024]={0};
   scope_desc_t desc;
   unsigned v;
   toggle_silence();
@@ -376,29 +376,6 @@ ndio_t pbufv8_get_vol(metadata_t self, const char* mode)
 // === Transform ===
 // The utilities used below don't compose matrices, they just set certain
 // elements.
-
-// static void identity(float *matrix, unsigned ndim)
-// { unsigned i;
-//   memset(matrix,0,sizeof(float)*(ndim+1)*(ndim+1));
-//   for(i=0;i<=ndim;++i) matrix[i*(ndim+2)]=1.0f;
-// }
-// static void setscale(float *matrix, unsigned ndim, unsigned idim, float s)
-// { matrix[idim*(ndim+2)]=s;}
-// static void flip(float *matrix, unsigned ndim, unsigned idim)
-// { matrix[idim*(ndim+2)]*=-1.0f;
-// }
-// /**
-//  * Shear parallel to \a adim by \a bdim:
-//  * \verbatim
-//  * r'[adim]=r[adim]+s*r[bdim]</tt>
-//  * \endverbatim
-//  */
-// static void shear(float *matrix, unsigned ndim, float s, unsigned adim, unsigned bdim)
-// { matrix[adim*(ndim+1)+bdim]=s;
-// }
-// static void translate(float *matrix, unsigned ndim, float s, unsigned idim)
-// { matrix[idim*(ndim+1)+ndim]=s;
-// }
 
 unsigned pbufv8_get_transform(metadata_t self, float *transform)
 { pbufv8_t *ctx=(pbufv8_t*)MetadataContext(self);

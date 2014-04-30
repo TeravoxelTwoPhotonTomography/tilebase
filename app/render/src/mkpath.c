@@ -4,6 +4,7 @@
  */
 #include <stdio.h>  //for logging
 #include <string.h> //for strchr
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -19,7 +20,6 @@
  #define stat             _stat
  #define chmod            _chmod
  #define umask            _umask
- #define errno            _errno
 
  #define S_ISDIR(e)       (((e)&_S_IFDIR)!=0)
  #define PATHSEP          '\\'
@@ -55,6 +55,14 @@ Error:
   return 0;  
 }
 
+static int windows_drive_letter(const char *p) {
+#ifndef _MSC_VER
+  return 0;
+#else
+  return (strlen(p)==2) && (p[1]==':');
+#endif
+}
+
 /**
  * Make all the directories leading up to \a path, then create \a path.
  *
@@ -66,10 +74,12 @@ static int mkpath_(char* path)
   TRY(path && *path);
   for (p=strchr(path+1, PATHSEP); p; p=strchr(p+1, PATHSEP)) 
   { *p='\0';
-    LOG(path);
-    if(!exists(path))
-    { LOG("DOES NOT EXIST %s\n",path); 
-      TRY((0==mkdir(path,PERMISSIONS)) || errno==EEXIST );
+    if(!windows_drive_letter(path)) {
+      //LOG("%s\n",path);
+      if(!exists(path))
+      { LOG("DOES NOT EXIST %s\n",path); 
+        TRY((0==mkdir(path,PERMISSIONS)) || errno==EEXIST );
+      }
     }
     *p=PATHSEP; // exists() has trouble with windows path seperators, so switch to unix style
   }

@@ -46,7 +46,7 @@ int g_flag_loaded_from_tree=0;
 opts_t OPTS={0};
 
 static unsigned print_addr(nd_t v, address_t address, aabb_t bbox, void* args)
-{ FILE* fp=args;
+{ FILE* fp=(FILE*)args;
   char path[1024]={0},*t;
 #ifdef FANCY
   fprintf(fp,"-- %-10d  %s"ENDL,
@@ -96,10 +96,11 @@ unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
   // optionally output orthogonal views
   if(OPTS.flag_output_ortho) {
     nd_t xy=0,yz=0,zx=0;
+    unsigned d;
     TRY(yz=ndheap(vol));
     TRY(zx=ndheap(vol));
     TRY(xy=ndcopy(ndheap(vol),vol,0,0)); // force copy to heap; strided copy from gpu doesn't work yet
-    unsigned d=ndndim(vol);
+    d=ndndim(vol);
     // set everyone to have 3 dims temporarily
     ndreshape(xy ,3,ndshape(xy));
     ndreshape(yz ,3,ndshape(yz));

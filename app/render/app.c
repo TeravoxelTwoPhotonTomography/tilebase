@@ -33,7 +33,7 @@
 #define LOG(...) fprintf(stderr,__VA_ARGS__)
 #define TRY(e)   do{if(!(e)) { DBG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); goto Error;}} while(0)
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(...) LOG(__VA_ARGS__)
 #else
@@ -45,16 +45,42 @@
 int g_flag_loaded_from_tree=0;
 opts_t OPTS={0};
 
+/** Adjusts OPTS so the bounding box matches the address.
+ *
+ *  Starting OPTS.ox and OPTS.lx define the domain over which the addresses
+ *  are intended to operate.  The target address gives some subdivision
+ *  within that box.  This function adjusts the box in place.
+ *
+ *  Also @see Note[1] at bottom of this file.
+ *
+ *  @returns 1 on success, 0 otherwise
+ */
+static void target_bbox(tiles_t tiles) {
+#define BIT(x,i) ((x>>i)&1)
+  int i;
+  address_t a = OPTS.target;
+  double *os=&OPTS.ox,
+         *ls=&OPTS.lx;
+  if(!a) return;
+  for(a=address_begin(a);a;a=address_next(a)) {
+    const unsigned id=address_id(a);
+    for(i=0;i<3;++i) {
+      ls[i]/=2.0;
+      os[i]+=BIT(id,i)*ls[i];
+    }
+  }
+#undef BIT
+}
+
 static unsigned print_addr(nd_t v, address_t address, aabb_t bbox, void* args)
 { FILE* fp=(FILE*)args;
   char path[1024]={0},*t;
-#ifdef FANCY
-  fprintf(fp,"-- %-10d  %s"ENDL,
-    (int)address_to_int(address,10),
-    (t=address_to_path(path,countof(path),address))?t:"(null)");
-#else
-  fprintf(fp,"%u"ENDL,(unsigned)address_to_int(address,10));
-#endif
+  if(OPTS.target) {
+    unsigned id=(unsigned)address_to_int(address,10);
+    fprintf(fp,id?"%u%u"ENDL:"%u"ENDL,(unsigned)address_to_int(OPTS.target,10),id);
+  } else {
+    fprintf(fp,"%u"ENDL,(unsigned)address_to_int(address,10));
+  }
   return 0;
 }
 
@@ -84,7 +110,7 @@ unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
     memset(full+n,0,countof(full)-n);
     TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"transform.txt"))>0);
     TRY(fp=fopen(full,"w"));
-    
+
     TRY(AABBGet(bbox,0,&o,&s));
     for(i=0;i<3;++i) // translation
       fprintf(fp,"%s: %lld\n",lbls[i],(long long)o[i]);
@@ -254,7 +280,8 @@ int main(int argc, char* argv[])
   }
 
   if(OPTS.flag_print_addresses)
-  { TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,print_addr,stdout));
+  { target_bbox(tiles);
+    TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,print_addr,stdout));
     goto Finalize;
   }
 
@@ -278,3 +305,13 @@ Error:
   goto Finalize;
 }
 
+/** Notes
+ *
+ *  [1]: target_bbox
+ *       The goal here was to restrict --print-address output to the domain
+ *       of the --target-address.  A simpler approach would've been to just
+ *       filter printed addresses such that the target address was a required
+ *       prefix.  I didn't realize this until I already had the current
+ *       implementation done, so the "simpler" route will not be taken; maybe
+ *       it's debatable which is simpler.
+ */

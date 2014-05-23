@@ -1,6 +1,6 @@
 #!/bin/env node
 
-// --- prelude --- 
+// --- prelude ---
 
 var spawn = require('child_process').spawn,
     map   = require('async').map,
@@ -43,9 +43,9 @@ function group_by_depth(addrs,cb) {
   cmd   [in]        Root command to run. Each argument should be in a list.
                     Example: ['./render','in','out']
   cb    [callback]  Called with a object that uses the addresses as keys.
-                    The values are objects with the addreses' parent, and 
+                    The values are objects with the addreses' parent, and
                     the holds for the job.
-*/ 
+*/
 function addresses(cmd,cb) {
   cmd.push("--print-addresses");
   var p=spawn(cmd[0],cmd.slice(1),{cwd:process.cwd()});
@@ -57,7 +57,7 @@ function addresses(cmd,cb) {
     map(buf.split('\n')
            .filter(function(e){return e;}),
         function(v,ret){d[v]={parent:Math.floor(v/10),holds:[]}; ret();},
-        function(err,result) {d['0'].parent=null; group_by_depth(d,cb);}
+        function(err,result) {var root=Math.min.apply(null,Object.keys(d)); d[root].parent=null; group_by_depth(d,cb);}
     );
   });
 }
@@ -88,7 +88,7 @@ function foreach(xs,f,ret) {
                          addresses is [addr,...]
                          holds     is [jid,...]
                          cb        is function(err,jid)
-                                      where 
+                                      where
                                         err is not null when there is an error
                                         jid is the job id of the submitted job (see qsub)
   cb is a function:      It is called with no arguments when exec is done.
@@ -174,7 +174,7 @@ function QSUB(opts,on_jid) {
   function done() {njobs--; on_jid(parseInt(buf));}
   console.log('['+njobs+']: '+opts);
   var j=spawn('qsub',opts);
-  j.on('exit',done); 
+  j.on('exit',done);
   j.stderr.on('data',function(data) {console.log('qsub stderr: '+data.toString());});
   j.stdout.on('data',function(data) {buf+=data.toString();});
   njobs++;

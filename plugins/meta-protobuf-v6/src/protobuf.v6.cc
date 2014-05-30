@@ -370,7 +370,7 @@ unsigned pbufv6_shape(metadata_t self, size_t *nelem, int64_t* shape)
 
 ndio_t pbufv6_get_vol(metadata_t self, const char* mode)
 { pbufv6_t *ctx=(pbufv6_t*)MetadataContext(self);
-  return ndioOpen(ctx->get_vol_path().c_str(),"series",mode);
+  return ndioOpen(ctx->get_vol_path().c_str(),0,mode);
 }
 
 // === Transform ===

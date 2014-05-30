@@ -47,7 +47,7 @@ using namespace std;
 #define TRYMSG(e,msg)      do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e,msg); goto Error;}} while(0)
 #define NEW(type,e,nelem)  TRY((e)=(type*)malloc(sizeof(type)*(nelem)))
 #define ZERO(type,e,nelem) memset((e),0,sizeof(type)*nelem)
-#define SAFEFREE(e)        if(e){free(e); (e)=NULL;} 
+#define SAFEFREE(e)        if(e){free(e); (e)=NULL;}
 #define countof(e)         (sizeof(e)/sizeof(*(e)))
 
 #ifdef _MSC_VER
@@ -95,8 +95,8 @@ struct pbufv1_t
   unsigned      read_mode,
                 write_mode;
   std::string   path;
-  
-  pbufv1_t(const char* _path):read_mode(0),write_mode(0),path(_path) 
+
+  pbufv1_t(const char* _path):read_mode(0),write_mode(0),path(_path)
   { // clean path of the trailing path seperator if it's there
     char e= *path.rbegin();
     if(e=='/') // assume unix-style path seperators
@@ -137,7 +137,7 @@ Error:
 
 /** Handles errors during protobuf parsing */
 class ErrorCollector:public google::protobuf::io::ErrorCollector
-{ 
+{
   int flag;
 public:
   ErrorCollector():flag(0) {}
@@ -145,7 +145,7 @@ public:
     {LOG("Protobuf: Error   - at line %d(%d):"ENDL"\t%s"ENDL,line,col,message.c_str()); flag=1;}
   virtual void AddWarning(int line, int col, const std::string & message)
     {LOG("Protobuf: Warning - at line %d(%d):"ENDL"\t%s"ENDL,line,col,message.c_str());}
-  int ok() {return flag==0;}  
+  int ok() {return flag==0;}
 };
 
 static
@@ -161,7 +161,7 @@ int readDesc(const char* filename, desc_t *desc)
   TRY(parser.Parse(raw,desc));
   TRY(e.ok());
 Finalize:
-  if(fd>=0) close(fd);    
+  if(fd>=0) close(fd);
   if(raw) delete raw;
   return isok;
 Error:
@@ -169,7 +169,7 @@ Error:
   goto Finalize;
 }
 
-/** 
+/**
  * Concatenates a number of strings together.  The constructed string is
  * returned in the preallocated buffer, \a buf.
  */
@@ -212,7 +212,7 @@ static
 int readDescFromPath(const char* path, const char* ext, desc_t *desc)
 { char name[1024];
   TRY(find(name,sizeof(name),path,ext));
-  return readDesc(name,desc); 
+  return readDesc(name,desc);
 Error:
   return 0;
 }
@@ -237,7 +237,7 @@ void getWriteTarget(char* out, size_t n,const char* path, const char* ext, const
   }
 }
 
-static 
+static
 int write(const desc_t &msg,const char* path, const char *ext, const char *default_prefix)
 { int fd;
   char out[1024];
@@ -281,7 +281,7 @@ unsigned pbufv1_is_fmt(const char* path, const char* mode)
   scope_desc_t desc;
   unsigned v;
   toggle_silence();
-  v=(find(name,sizeof(name),path,".acquisition") && 
+  v=(find(name,sizeof(name),path,".acquisition") &&
           find(name,sizeof(name),path,".microscope") &&
           readDesc(name,&desc));
   toggle_silence();
@@ -307,7 +307,7 @@ void pbufv1_close(metadata_t self)
 { pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
   if(ctx->write_mode)
   { WARN(write(ctx->scope,ctx->path.c_str(),".microscope" ,"default"));
-    WARN(write(ctx->stack,ctx->path.c_str(),".acquisition","default"));  
+    WARN(write(ctx->stack,ctx->path.c_str(),".acquisition","default"));
   }
   delete ctx;
 }
@@ -368,7 +368,7 @@ unsigned pbufv1_shape(metadata_t self, size_t *nelem, int64_t* shape)
 
 ndio_t pbufv1_get_vol(metadata_t self, const char* mode)
 { pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
-  return ndioOpen(ctx->get_vol_path().c_str(),"series",mode);
+  return ndioOpen(ctx->get_vol_path().c_str(),0,mode);
 }
 
 // === Transform ===
@@ -401,7 +401,7 @@ ndio_t pbufv1_get_vol(metadata_t self, const char* mode)
 unsigned pbufv1_get_transform(metadata_t self, float *transform)
 { pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
 #if 1
-  nd_t vol;  
+  nd_t vol;
   unsigned i,n;
   int64_t shape[3],ori[3];
 
@@ -434,7 +434,7 @@ unsigned pbufv1_get_transform(metadata_t self, float *transform)
     Map<Matrix<float,Dynamic,Dynamic,RowMajor> > M(transform,n+1,n+1);
     M.setIdentity();
     M(2,1)=1.0/(float)ndshape(vol)[1]; // shear parallel to z by y: 1 plane along length of 1
-    M=(stage              // translate to stage origin      
+    M=(stage              // translate to stage origin
       *S                  // scale to physical coordinates (and flip)
       *center.inverse()   // move back to stack origin
       *R*F                // rotate and flip field

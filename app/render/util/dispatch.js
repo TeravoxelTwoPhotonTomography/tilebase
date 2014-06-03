@@ -156,6 +156,7 @@ function stopQstatPolling() {clearTimeout(poll);}
 function qsubopts(name,log,nbatch,addrs,holds) {
   var holdopt='';
   var batchcmd=[path.join(__dirname,'worker.js '),addrs.join(',')].concat(process.argv.slice(2)).join(' ');
+  batchcmd = "umask 002 && stat /nobackup/mousebrainmicro && " + batchcmd;
   console.log("QSUBOPTS: holds: "+holds);
   if(holds.length)
     holdopt='-hold_jid '+holds.join(',');

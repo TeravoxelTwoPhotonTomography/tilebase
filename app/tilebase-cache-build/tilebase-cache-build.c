@@ -22,6 +22,8 @@ void progress(const char *path, void* data)
 int main(int argc, char *argv[])
 { char *fmt;
   size_t count=0;
+  
+  ndioAddPluginPath("plugins");
   if(argc<2)
   { printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));
     return 0;

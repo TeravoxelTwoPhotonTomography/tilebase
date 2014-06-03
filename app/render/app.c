@@ -99,7 +99,7 @@ unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
   printf("SAVING %s"ENDL,full);
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
-  ndioClose(ndioWrite(ndioOpen(full,"series","w"),vol));
+  ndioClose(ndioWrite(ndioOpen(full,ndioFormat("series"),"w"),vol));
 
   // output text document with origin and scale
   if(bbox)
@@ -144,12 +144,12 @@ unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
     // output
     memset(full+n,0,countof(full)-n);
     TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"YZ.%.tif"))>0);
-    ndioClose(ndioWrite(ndioOpen(full,"series","w"),yz));
+    ndioClose(ndioWrite(ndioOpen(full,ndioFormat("series"),"w"),yz));
     ndfree(yz);
 
     memset(full+n,0,countof(full)-n);
     TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,"ZX.%.tif"))>0);
-    ndioClose(ndioWrite(ndioOpen(full,"series","w"),zx));
+    ndioClose(ndioWrite(ndioOpen(full,ndioFormat("series"),"w"),zx));
     ndfree(zx);
   }
 Finalize:
@@ -184,7 +184,7 @@ unsigned save_raveler(nd_t vol, address_t address, aabb_t bbox, void* args)
   printf("SAVING %s"ENDL,full);
   TRY(mkpath(full));
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
-  ndioClose(ndioWrite(ndioOpen(full,"series","w"),tmp2));
+  ndioClose(ndioWrite(ndioOpen(full,ndioFormat("series"),"w"),tmp2));
 Finalize:
   ndfree(tmp);
   ndfree(tmp2);
@@ -206,7 +206,7 @@ nd_t load(address_t address)
   TRY((snprintf(full+n,countof(full)-n,"%c%s",PATHSEP,OPTS.dst_pattern))>0);
   printf("LOADING %s"ENDL,full);
 #if 1
-  TRY(f=ndioOpen(full,"series","r"));
+  TRY(f=ndioOpen(full,0,"r"));
   TRY(out=ndioShape(f));
   TRY(ndref(out,malloc(ndnbytes(out)),nd_heap));
   TRY(ndioRead(f,out));
@@ -235,6 +235,7 @@ int main(int argc, char* argv[])
 { unsigned ecode=0;
   tiles_t tiles=0;
   handler_t on_ready=save;
+  ndioAddPluginPath("plugins");
   { int isok=0;
     OPTS=parseargs(&argc,&argv,&isok);
     TRY(isok);

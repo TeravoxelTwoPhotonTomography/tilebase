@@ -77,7 +77,7 @@ static size_t gaussian_filter_radius(float sigma, float threshold)
 nd_t make_aa_filter(float scale,nd_t workspace)
 { nd_t out=workspace;  
   size_t r,n; //filter radius, size
-  scale=0.7*fabs(scale)/2.0; // this is the sigma that gets used...the divisor is pretty arbitrary
+  scale=0.5*fabs(scale); // this is the sigma that gets used...the divisor is pretty arbitrary
   //if(scale<=1.0f) return 0; // no filter needed
   r=gaussian_filter_radius(scale,0.01);
   n=2*r+1;

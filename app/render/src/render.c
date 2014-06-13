@@ -24,7 +24,7 @@
 #define countof(e) (sizeof(e)/sizeof(*(e)))
 
 #define ENDL          "\n"
-#define LOG(...)      fprintf(stderr,__VA_ARGS__) 
+#define LOG(...)      fprintf(stderr,__VA_ARGS__)
 #define TRY(e)        do{if(!(e)) { LOG("%s(%d): %s()"ENDL "\tExpression evaluated as false."ENDL "\t%s"ENDL,__FILE__,__LINE__,__FUNCTION__,#e); breakme(); goto Error;}} while(0)
 #define NEW(T,e,N)    TRY((e)=(T*)malloc(sizeof(T)*(N)))
 #define ALLOCA(T,e,N) TRY((e)=(T*)alloca(sizeof(T)*(N)))
@@ -35,7 +35,7 @@
 #define DEBUG
 #define PROFILE_MEMORY
 #define ENABLE_PROGRESS_OUTPUT
-//#define DEBUG_DUMP_IMAGES
+// #define DEBUG_DUMP_IMAGES
 #define PROFILE
 
 #ifdef DEBUG
@@ -124,14 +124,14 @@ struct _desc_t
   size_t free,total;
 
   /* INTERFACE */
-  /* Returns an array that fills the bounding box \a bbox that corresponds to 
+  /* Returns an array that fills the bounding box \a bbox that corresponds to
      the a node on the subdivision tree specified by \a path.
 
      This usually involves a recursive descent of the tree, so this function is
      expected to call itself.  Various helper functions below help with the
      traversal and manage the desc_t workspace.
 
-     The implementation can call desc->yield() to pass data out during the 
+     The implementation can call desc->yield() to pass data out during the
      tree traversal.  For example, this is useful for saving each hierarchically
      downsampled volume to disk as a root node is rendered.
    */
@@ -160,17 +160,17 @@ static void affine_workspace__init(affine_workspace *ws)
 static double boundary_value(nd_t vol)
 {
   switch(ndtype(vol))
-  { 
+  {
     case nd_u8:
     case nd_u16:
     case nd_u32:
     case nd_u64:
     case nd_f32:
     case nd_f64: return 0; break;
-    case nd_i8:  return 0x80; break; 
+    case nd_i8:  return 0x80; break;
     case nd_i16: return 0x8000; break;
-    case nd_i32: return 0x80000000; break; 
-    case nd_i64: return 0x8000000000000000LL; break; 
+    case nd_i32: return 0x80000000; break;
+    case nd_i64: return 0x8000000000000000LL; break;
     default: return 0;
   }
 }
@@ -303,18 +303,18 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox, int64_t x_nm, int64_t y_nm, int
       break;
     }
   }
-  TRY(i<desc->nbufs);                           // check that one was available  
+  TRY(i<desc->nbufs);                           // check that one was available
   TRY(v=desc->bufs[i]);                         // ensure bufs was init'd - see set_ref_shape()
   desc->inuse[i]=1;
   DBG("    alloc_vol(): [%3u] buf=%u"ENDL,(unsigned)sum(desc->nbufs,desc->inuse),(unsigned)i);
   if(resize)
-  { for(i=0;i<ndim;++i) // set spatial dimensions
+  { for(i=0;i<ndim && i<countof(res);++i) // set spatial dimensions
       TRY(ndShapeSet(v,i,shape_nm[i]/res[i]));
     for(;i<ndndim(desc->ref);++i) // other dimensions are same as input
       TRY(ndShapeSet(v,(unsigned)i,ndshape(desc->ref)[i]));
     TRY(ndCudaSyncShape(v)); // expensive...worth avoiding
   }
-  TRY(ndfill(v,desc->aws.params.boundary_value));  
+  TRY(ndfill(v,desc->aws.params.boundary_value));
   return v;
 Error:
   return 0;
@@ -348,13 +348,13 @@ static unsigned same_shape(nd_t a, nd_t b)
 }
 
 static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
-{ 
+{
 #if HAVE_CUDA
   { size_t free,total;
     cudaMemGetInfo(&free,&total);
     LOG("GPU Mem:\t%6.2f free\t%6.2f total\n",free/1e6,total/1e6);
   }
-  
+
   if(!ws->gpu[0])
   { TRY(ws->gpu[0]=NDCUDA(vol,0));
     TRY(ws->gpu[1]=NDCUDA(vol,0));
@@ -381,7 +381,7 @@ Error:
 }
 
 static unsigned affine_workspace__gpu_resize(affine_workspace *ws, nd_t vol)
-{ 
+{
   if(!ws->gpu_xform)
   { TRY(ndreshapev(ndcast(ws->host_xform=ndinit(),nd_f32),2,ndndim(vol)+1,ndndim(vol)+1));
     TRY(ws->gpu_xform=NDCUDA(ws->host_xform,0));
@@ -400,7 +400,7 @@ Error:
  */
 nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i=0,ndim=ndndim(vol);
-  for(i=0;i<3;++i) 
+  for(i=0;i<3;++i)
     TIME(TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i]))); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
   DUMP("aafilt-vol.%.tif",vol);
@@ -452,11 +452,11 @@ typedef struct _subdiv_t
 static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,size_t total)
 { subdiv_t ctx=0;
 #if HAVE_CUDA
-  TRY(ndndim(in)>3); // assume there's a z.
+  TRY(ndndim(in)>=3); // assume there's a z.
   NEW(struct _subdiv_t,ctx,1);
   ZERO(struct _subdiv_t,ctx,1);
 #define CEIL(num,den) (((num)+(den)-1)/(den))
-  
+
  // TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
   ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
 #undef CEIL
@@ -479,10 +479,10 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
   ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
   LOG("\t%5s: %10d\n" "\t%5s: %10d\n","n",(int)ctx->n,"dz_px",(int)ctx->dz_px);
-  { 
+  {
     int r,c;
     ctx->dz_nm=(int64_t*)calloc(ndim+1,sizeof(int64_t));
-    for(r=0;r<(ndim+1);++r)      
+    for(r=0;r<(ndim+1);++r)
       ctx->dz_nm[r]=ctx->dz_px*transform[(ndim+1)*r+2];
   }
   return ctx;
@@ -490,7 +490,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
 Error:
   return 0;
 }
-static void free_subdiv(subdiv_t ctx) 
+static void free_subdiv(subdiv_t ctx)
 { if(ctx)
   { if(ctx->n>1)
       ndfree(ndref(ctx->carray,0,nd_unknown_kind));
@@ -504,7 +504,7 @@ static float* subdiv_xform(subdiv_t ctx)   {return ctx->transform;}
 static int  next_subdivision(subdiv_t ctx)
 { if(++ctx->i<ctx->n)
   { TRY(ctx->n>1); // sanity check..remove once confirmed
-    if((ctx->i+1)*ctx->dz_px>ctx->zmax) {// adjust last block if necessary 
+    if((ctx->i+1)*ctx->dz_px>ctx->zmax) {// adjust last block if necessary
       int z=ctx->zmax-ctx->i*ctx->dz_px;
       if(z<=0) return 0; // wtf
       ndshape(ctx->carray)[2]=z; // don't adjust strides, will get copied to a correctly formatted array on the gpu
@@ -532,7 +532,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   TRY(tiles=TileBaseArray(desc->tiles));
   for(i=0;i<TileBaseCount(desc->tiles);++i)
   { // Maybe initialize
-    if(!AABBHit(bbox,TileAABB(tiles[i]))) continue;                             // Select hit tiles    
+    if(!AABBHit(bbox,TileAABB(tiles[i]))) continue;                             // Select hit tiles
     PROGRESS(".");
     // Wait to init until a hit is confirmed.
     if(!in)                                                                     // Alloc on first iteration: in, transform
@@ -546,9 +546,9 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
 #if HAVE_CUDA
 
       if(desc->total==0)
-        TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total)); 
+        TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total));
 #endif
-    } 
+    }
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
     { nd_t s=TileShape(tiles[i]);
       if(ndnbytes(in)<ndnbytes(s))
@@ -580,7 +580,7 @@ Error:
 }
 
 static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace)
-{ nd_t t,out=workspace;   
+{ nd_t t,out=workspace;
   // maybe allocate output
   if(!out)
   { int64_t *cshape_nm;
@@ -609,7 +609,7 @@ Error:
  *          release_vol().
  */
 static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
-{   
+{
   unsigned i;
   nd_t out=0;
   aabb_t *cboxes=0;
@@ -649,7 +649,7 @@ Error:
 }
 
 //
-// JUST THE ADDRESS SEQUENCE 
+// JUST THE ADDRESS SEQUENCE
 // yielded in oreder of dependency, leaves (no dependencies) first.
 //
 static nd_t addr_seq__child(desc_t *desc, aabb_t bbox, address_t path)
@@ -701,7 +701,7 @@ static nd_t target__get_child(desc_t *desc, aabb_t bbox, address_t path)
   { if(!isleaf(desc,bbox))
       render_node(desc,bbox,path);
   }
-  
+
   return out;
 Error:
   return 0;
@@ -714,7 +714,7 @@ static void target__setup(desc_t *desc, address_t target, loader_t loader)
 
 // === INTERFACE ===
 
-/** Select a subvolume from the total data set using fractional coordinates.  
+/** Select a subvolume from the total data set using fractional coordinates.
   */
 aabb_t AdjustTilesBoundingBox(tiles_t tiles, double o[3], double s[3])
 { aabb_t bbox;

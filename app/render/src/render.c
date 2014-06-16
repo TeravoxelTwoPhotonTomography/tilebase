@@ -398,6 +398,7 @@ Error:
  * The caller should not free it.
  * \todo FIXME: assumes working with at-least-3d data.
  */
+#if 1
 nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i=0,ndim=ndndim(vol);
   for(i=0;i<3;++i)
@@ -416,6 +417,17 @@ Error:
     LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(ws->gpu[i]));
   return 0;
 }
+#else // skip aafilt
+nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws) 
+{ TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
+  TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
+  ws->i=0;
+  return ws->gpu[0];
+Error:  
+  LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(ws->gpu[0]));
+  return 0;
+}
+#endif
 
 nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
 { TRY(affine_workspace__gpu_resize(ws,dst));

@@ -15,8 +15,10 @@ if(NOT TARGET eigen)
   ExternalProject_Add(eigen
     URL     ${EIGEN_URL}
     URL_MD5 ${EIGEN_MD5}
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EigenTesting.cmake.patch <SOURCE_DIR>/cmake/EigenTesting.cmake
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
                -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+               -Wno-dev
   )
 endif()
 get_target_property(EIGEN_ROOT_DIR eigen _EP_INSTALL_DIR)

@@ -40,6 +40,7 @@
 #define DBG(...)
 #endif
 
+#undef max
 #define max(a,b)  (((a)<(b))?(b):(a))
 
 int g_flag_loaded_from_tree=0;
@@ -74,8 +75,8 @@ static void target_bbox(tiles_t tiles) {
 
 static unsigned print_addr(nd_t v, address_t address, aabb_t bbox, void* args)
 { FILE* fp=(FILE*)args;
-  char path[1024]={0},*t;
-  if(OPTS.target) {
+  char path[1024]={0};
+  if(OPTS.target && OPTS.flag_print_addresses) {
     unsigned id=(unsigned)address_to_int(address,10);
     fprintf(fp,id?"%u%u"ENDL:"%u"ENDL,(unsigned)address_to_int(OPTS.target,10),id);
   } else {
@@ -235,7 +236,8 @@ int main(int argc, char* argv[])
 { unsigned ecode=0;
   tiles_t tiles=0;
   handler_t on_ready=save;
-  ndioAddPluginPath("plugins");
+  ndioAddPluginPath("plugins");             // search this path for plugins (relative to executable)
+  ndioAddPluginPath(TILEBASE_INSTALL_PATH); // so installed plugins will be found from the build location
   { int isok=0;
     OPTS=parseargs(&argc,&argv,&isok);
     TRY(isok);

@@ -7,8 +7,11 @@ include(FindPackageHandleStandardArgs)
 # === PACKAGE ===
 #
 
-set(PROTOBUF_URL http://dl.dropbox.com/u/782372/Software/protobuf-2.4.1.zip) 
-set(PROTOBUF_MD5 ce3ef48c322ea14016fdf845219f386a)
+#set(PROTOBUF_URL http://dl.dropbox.com/u/782372/Software/protobuf-2.4.1.zip) 
+#set(PROTOBUF_MD5 ce3ef48c322ea14016fdf845219f386a)
+
+set(PROTOBUF_URL http://dl.dropboxusercontent.com/u/21394583/protobuf-2.5.0.zip)
+set(PROTOBUF_MD5 5aa55697be1e63c055720695a8e590bb)
 
 if(WIN32)
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -33,8 +36,8 @@ if(WIN32)
   endif()
   set(PROP _EP_SOURCE_DIR)
   set(INC src)
-  set(LIB vsprojects/Debug) #${CMAKE_CFG_INTDIR})
-  set(BIN vsprojects/Debug) #${CMAKE_CFG_INTDIR})
+  set(LIB vsprojects/${PLAT}/Debug) #${CMAKE_CFG_INTDIR})
+  set(BIN vsprojects/${PLAT}/Debug) #${CMAKE_CFG_INTDIR})
 else()
   if(NOT TARGET protobuf)
     ExternalProject_Add(protobuf

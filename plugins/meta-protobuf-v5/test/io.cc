@@ -1,3 +1,8 @@
+// solves a std::tuple problem in vs2012
+#define GTEST_HAS_TR1_TUPLE     0
+#define GTEST_USE_OWN_TR1_TUPLE 1
+
+
 #include <gtest/gtest.h>
 #include "tilebase.h"
 #include "plugins/meta-protobuf-v5/config.h"

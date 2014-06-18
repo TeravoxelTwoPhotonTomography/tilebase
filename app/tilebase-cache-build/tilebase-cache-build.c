@@ -1,6 +1,7 @@
 #include "tilebase.h"
 #include <stdio.h>
 #include <string.h>
+#include <app/tilebase-cache-build/config.h>
 
 #ifdef _MSC_VER
 #define PATHSEP '\\'
@@ -23,7 +24,9 @@ int main(int argc, char *argv[])
 { char *fmt;
   size_t count=0;
   
-  ndioAddPluginPath("plugins");
+  //ndioAddPluginPath("plugins");
+  ndioAddPluginPath(TILEBASE_INSTALL_PATH); // so installed plugins will be found from the build location
+
   if(argc<2)
   { printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));
     return 0;

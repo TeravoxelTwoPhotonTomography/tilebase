@@ -2,6 +2,7 @@
  * \file
  * Metadata format protobuf-based v0.
  */
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <google/protobuf/io/coded_stream.h>
@@ -84,8 +85,8 @@ static const char* normalize_extension(const char *ext)
 }
 
 static size_t rfind_pathsep(const std::string& s)
-{ long i=s.rfind('\\'),
-       j=s.rfind('/');
+{ size_t i=s.rfind('\\'),
+         j=s.rfind('/');
   return (i>j)?i:j;
 }
 
@@ -402,7 +403,7 @@ unsigned pbufv1_get_transform(metadata_t self, float *transform)
 { pbufv1_t *ctx=(pbufv1_t*)MetadataContext(self);
 #if 1
   nd_t vol;
-  unsigned i,n;
+  unsigned n;
   int64_t shape[3],ori[3];
 
   ndio_t file;

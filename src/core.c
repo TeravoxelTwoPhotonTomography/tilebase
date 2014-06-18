@@ -376,7 +376,7 @@ tiles_t TileBaseOpenWithProgressIndicator(const char *path_, const char* format,
   if((cache=TileBaseCacheOpen(path,"r")) && TileBaseCacheRead(cache,&out) && out && out->sz>0)
   { TileBaseCacheClose(cache);
   } else
-  { if(!cache) // no cache was found so try to make one from scratch
+  { if(!cache || !out || out->sz==0) // no cache was found so try to make one from scratch
     { NEW( struct _tiles_t,out,1);
       ZERO(struct _tiles_t,out,1);
       out->cache=TileBaseCacheOpen(path,"w");

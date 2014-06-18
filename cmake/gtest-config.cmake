@@ -61,7 +61,7 @@ if(NOT GTEST_INCLUDE_DIR) #if this is set, assume gtest location has been overri
       set(loc_debug   ${loc})
       set(loc_release ${loc})
     endif()
-    install(FILES ${loc_release} DESTINATION bin CONFIGURATIONS)
+    #install(FILES ${loc_release} DESTINATION bin CONFIGURATIONS)
     install(FILES ${loc_debug}   DESTINATION bin CONFIGURATIONS Debug)
     install(FILES ${loc_release} DESTINATION bin CONFIGURATIONS Release)
   endforeach()

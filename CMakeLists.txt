@@ -89,8 +89,7 @@ target_link_libraries(tilebase
 ### macro for copying plugins to build products
 macro(tilebase_copy_plugins_to_target _target)
   foreach(PLUGIN ${PLUGINS})
-    get_filename_component(_plugin_tgt ${PLUGIN} NAME)
-    get_target_property(loc ${_plugin_tgt} LOCATION)
+    get_filename_component(_plugin_tgt ${PLUGIN} NAME)    
     add_custom_command(TARGET ${_target} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${_target}>/plugins
       COMMAND ${CMAKE_COMMAND} -E copy
@@ -98,7 +97,7 @@ macro(tilebase_copy_plugins_to_target _target)
           $<TARGET_FILE_DIR:${_target}>/plugins
           COMMENT "Copying ${_plugin_tgt} to build path for ${_target}."
           )  
-    add_dependencies(${_target} v)
+    add_dependencies(${_target} ${PLUGIN})
   endforeach()
 endmacro()
 
@@ -107,6 +106,8 @@ file(GLOB PLUGINS plugins/*)
 foreach(PLUGIN ${PLUGINS})
   add_subdirectory(${PLUGIN})
 endforeach(PLUGIN)
+#Get just the names (not the full paths) of the plugins this time.
+file(GLOB PLUGINS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/plugins plugins/*)
 
 ### APPS ###
 add_subdirectory(app/render)

@@ -171,7 +171,7 @@ static double boundary_value(nd_t vol)
     case nd_i8:  return 0x80; break;
     case nd_i16: return 0x8000; break;
     case nd_i32: return 0x80000000; break;
-    case nd_i64: return 0x8000000000000000LL; break;
+    case nd_i64: return (double)(0x8000000000000000LL); break;
     default: return 0;
   }
 }
@@ -186,9 +186,9 @@ static desc_t make_desc(tiles_t tiles, double voxel_um[3], size_t nchildren, siz
   desc_t out;
   memset(&out,0,sizeof(out));
   out.tiles=tiles;
-  out.x_nm=voxel_um[0]*um2nm;
-  out.y_nm=voxel_um[1]*um2nm;
-  out.z_nm=voxel_um[2]*um2nm;
+  out.x_nm=(float)(voxel_um[0]*um2nm);
+  out.y_nm=(float)(voxel_um[1]*um2nm);
+  out.z_nm=(float)(voxel_um[2]*um2nm);
   out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
   out.nchildren=nchildren;
   out.countof_leaf=countof_leaf;
@@ -210,7 +210,7 @@ static void cleanup_desc(desc_t *desc)
 }
 
 static unsigned isleaf(const desc_t*const desc, aabb_t bbox)
-{ int64_t c=AABBVolume(bbox)/(double)desc->voxvol_nm3;
+{ int64_t c=(int64_t)(AABBVolume(bbox)/(double)desc->voxvol_nm3);
   return c<(int64_t)desc->countof_leaf;
 }
 
@@ -221,7 +221,7 @@ static int pathlength(desc_t *desc, aabb_t bbox)
   ALLOCA(aabb_t,cboxes,desc->nchildren);
   ZERO(  aabb_t,cboxes,desc->nchildren);
   if(isleaf(desc,bbox)) return 1;
-  AABBBinarySubdivision(cboxes,desc->nchildren,bbox);
+  AABBBinarySubdivision(cboxes,(unsigned)desc->nchildren,bbox);
   n=pathlength(desc,cboxes[0]);
   for(i=0;i<desc->nchildren;++i) AABBFree(cboxes[i]);
   return n+1;
@@ -237,7 +237,7 @@ static int preallocate(desc_t *desc, aabb_t bbox)
   ZERO(nd_t,desc->bufs,n);
   NEW(int,desc->inuse,n);
   ZERO(int,desc->inuse,n);
-  desc->nbufs=n;
+  desc->nbufs=(int)n;
   return 1;
 Error:
   return 0;
@@ -250,7 +250,7 @@ static int preallocate_for_render_one_target(desc_t *desc, aabb_t bbox)
   ZERO(nd_t,desc->bufs,n);
   NEW(int,desc->inuse,n);
   ZERO(int,desc->inuse,n);
-  desc->nbufs=n;
+  desc->nbufs=(int)n;
   return 1;
 Error:
   return 0;
@@ -310,12 +310,12 @@ static nd_t alloc_vol(desc_t *desc, aabb_t bbox, int64_t x_nm, int64_t y_nm, int
   DBG("    alloc_vol(): [%3u] buf=%u"ENDL,(unsigned)sum(desc->nbufs,desc->inuse),(unsigned)i);
   if(resize)
   { for(i=0;i<ndim && i<countof(res);++i) // set spatial dimensions
-      TRY(ndShapeSet(v,i,shape_nm[i]/res[i]));
+      TRY(ndShapeSet(v,(unsigned)i,shape_nm[i]/res[i]));
     for(;i<ndndim(desc->ref);++i) // other dimensions are same as input
       TRY(ndShapeSet(v,(unsigned)i,ndshape(desc->ref)[i]));
     TRY(ndCudaSyncShape(v)); // expensive...worth avoiding
   }
-  TRY(ndfill(v,desc->aws.params.boundary_value));
+  TRY(ndfill(v,(uint64_t)(desc->aws.params.boundary_value)));
   return v;
 Error:
   return 0;
@@ -471,7 +471,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
 #define CEIL(num,den) (((num)+(den)-1)/(den))
 
  // TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
-  ctx->n=CEIL(ndnbytes(in)*2,free); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
+  ctx->n=(int)(CEIL(ndnbytes(in)*2,free)); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
 #undef CEIL
   TRY(ctx->n<ndshape(in)[2]);
 
@@ -493,7 +493,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
   LOG("\t%5s: %10d\n" "\t%5s: %10d\n","n",(int)ctx->n,"dz_px",(int)ctx->dz_px);
   {
-    int r,c;
+    int r;
     ctx->dz_nm=(int64_t*)calloc(ndim+1,sizeof(int64_t));
     for(r=0;r<(ndim+1);++r)
       ctx->dz_nm[r]=ctx->dz_px*transform[(ndim+1)*r+2];
@@ -534,6 +534,14 @@ Error:
   return 0;
 }
 
+static unsigned crop(nd_t vol,nd_t crop) {
+  if(ndndim(vol)!=ndndim(crop))
+    return 0;
+  memcpy(ndshape(vol),ndshape(crop),ndndim(vol)*sizeof(size_t));
+  return 1;
+}
+
+
 /**
  * Does not assume all tiles have the same size. (fixed: ngc)
  */
@@ -571,6 +579,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
+    TRY(crop(ndPushShape(in),TileCrop(tiles[i])));
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
@@ -578,6 +587,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
       TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
     } while(next_subdivision(subdiv));
     free_subdiv(subdiv);
+    TRY(in=ndPopShape(in));
     subdiv=0;
   } // end loop over tiles
 Finalize:

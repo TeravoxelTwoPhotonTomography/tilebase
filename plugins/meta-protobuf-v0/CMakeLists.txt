@@ -46,13 +46,13 @@ if(PROTOBUF_FOUND AND EIGEN_FOUND)
   # TARGETS
   ##############################################################################
 
-  add_definitions(-fPIC)
   add_library(meta-protobuf-v0 MODULE ${ALL})
   add_dependencies(meta-protobuf-v0 eigen)
   target_link_libraries(meta-protobuf-v0
     tilebase
     ${CMAKE_THREAD_LIBS_INIT}
     ${PROTOBUF_LIBRARY})
+  set_target_properties(meta-protobuf-v0 PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 
   ##############################################################################

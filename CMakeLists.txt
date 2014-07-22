@@ -10,21 +10,13 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
   "Tile Database"
   )
 
-macro(show v)
-  message(STATUS "${v} is ${${v}}")
-endmacro()
+include(cmake/show.cmake)
+include(cmake/rpath.cmake)
+include(cmake/shlwapi.cmake)
 
 ################################################################################
 # CONFIG
 ################################################################################
-
-set(RPATH \$ORIGIN)
-if(APPLE)
-  set(RPATH @rpath)
-endif()
-
-find_package(GTEST CONFIG PATHS cmake)
-
 set(TILEBASE_PLUGIN_PATH plugins)
 set(NDIO_PLUGIN_PATH     ${CMAKE_CURRENT_BINARY_DIR}/plugins)
 
@@ -48,13 +40,6 @@ set(TILEBASE_TEST_DATA_PATH ${PROJECT_SOURCE_DIR}/test/data)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_BINARY_DIR}/config.h)
 include_directories(${PROJECT_BINARY_DIR})
 
-### Windows shell lightweight utility functions - for plugin search
-if(WIN32)
-find_library(SHLWAPI Shlwapi.lib) 
-else()
-set(SHLWAPI)
-endif()
-
 ################################################################################
 # SOURCE
 ################################################################################
@@ -75,7 +60,6 @@ DESTINATION include/tilebase)
 
 ### LIBRARY ###
 
-add_definitions(-fPIC)
 add_library(tilebase STATIC
   ${SRCS} ${HDRS}
   config.h.in
@@ -87,6 +71,7 @@ target_link_libraries(tilebase
   ${SHLWAPI}
   ${YAML_LIBRARIES}
 )
+set_target_properties(tilebase PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 ### macro for copying plugins to build products
 macro(tilebase_copy_plugins_to_target _target)
@@ -120,55 +105,12 @@ add_subdirectory(app/query-neighbors)
 add_subdirectory(app/points)
 #add_subdirectory(app/align-pair) # doesn't work, may never work
 
-###############################################################################
-#  Testing
-###############################################################################
+### TESTS ###
+enable_testing()
+add_subdirectory(test)
 
-file(GLOB TEST_SOURCES test/*.cc)
-if(GTEST_FOUND AND TEST_SOURCES)
-  find_package(Threads)
-  enable_testing()
-  include_directories(${PROJECT_SOURCE_DIR})
-  include_directories(${GTEST_INCLUDE_DIR})
-  
-  add_executable(test-tilebase ${TEST_SOURCES})
-  target_link_libraries(test-tilebase    
-    ${GTEST_BOTH_LIBRARIES}
-    ${CMAKE_THREAD_LIBS_INIT}
-    tilebase
-    )
-  add_dependencies(test-tilebase
-    gtest
-    ${PLUGINS}
-  )
-  set_target_properties(test-tilebase PROPERTIES 
-    INSTALL_RPATH ${RPATH}
-  )
-  nd_copy_plugins_to_target(test-tilebase ${ND_PLUGINS})
-  gtest_copy_shared_libraries(test-tilebase)
-  tilebase_copy_plugins_to_target(test-tilebase)
-  add_test(TestTilebase test-tilebase)
-  install(TARGETS test-tilebase
-          RUNTIME DESTINATION bin/test)
-endif()
-
-###############################################################################
-#  Documentation
-###############################################################################
-
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in
-                 ${CMAKE_CURRENT_BINARY_DIR}/doc/Doxyfile
-                 @ONLY
-                 )
-  add_custom_target(tilebase-docs
-    ${DOXYGEN_EXECUTABLE} ${PROJECT_BINARY_DIR}/doc/Doxyfile
-    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-    COMMENT           "Generating API Docs"
-    VERBATIM
-    )
-endif()
+### DOCUMENTATION ###
+add_subdirectory(doc)
 
 ###############################################################################
 #  Install

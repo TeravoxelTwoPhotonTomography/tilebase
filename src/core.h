@@ -6,7 +6,8 @@
  *  \code{c}
  *  #include <stdlib.h>
  *  #include "nd.h"
- *  #include "aabb.h"
+nd
+0 *  #include "aabb.h"
  *  #include "core.h"
  *  \endcode
  *  \todo Use the standard pattern in the master header.
@@ -52,6 +53,7 @@ void    TileFree(tile_t tile);
 aabb_t  TileAABB(tile_t self); // returned AABB owned by tile.
 ndio_t  TileFile(tile_t self); // returned file handle already opened.  Owned by tile.
 nd_t    TileShape(tile_t self);// returned array is still owned by the tile.
+nd_t    TileCrop(tile_t self); // returned array is still owned by the tile.
 float*  TileTransform(tile_t self);
 float   TileVoxelSize(tile_t self, unsigned idim);
 const char* TilePath(tile_t self); // returned string is owned by the tile.

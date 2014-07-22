@@ -34,6 +34,7 @@
 #define REPORT(e,msg) LOG("%s(%d): %s()\n\t%s\n\t%s\n\n",__FILE__,__LINE__,__FUNCTION__,#e,msg)
 #define TRY(e) do{if(!(e)) {REPORT(e,"Evaluated to false."); goto Error;}}while(0)
 #define FAIL(msg) do{ REPORT(FAIL,msg); goto Error;} while(0)
+#define HERE          REPORT(>>>,"Here");
 
 #define NEW(T,e,N)    TRY((e)=(T*)malloc((N)*sizeof(T)))
 #define ZERO(T,e,N)   TRY(memset((e),0,(N)*sizeof(T)))
@@ -263,6 +264,7 @@ static void* sequence_of_floats(tilebase_cache_t self);
 static void  ori(tilebase_cache_t self);
 static void  box(tilebase_cache_t self);
 static void  dims(tilebase_cache_t self);
+static void  crop(tilebase_cache_t self);
 static void  transform(tilebase_cache_t self);
 // state stack manipulation
 static void* pop(tilebase_cache_t self);
@@ -346,6 +348,12 @@ void dims(tilebase_cache_t self)
     TRY(ndShapeSet(LASTTILE->shape,(unsigned int)i,(size_t)SEQI[i]));
   Error:;// pass
 }
+void crop(tilebase_cache_t self)
+{ size_t i;
+  for(i=0;i<SEQ_N;++i)
+    TRY(ndShapeSet(LASTTILE->crop,(unsigned int)i,(size_t)SEQI[i]));  
+  Error:;// pass
+}
 void transform(tilebase_cache_t self)
 { size_t i;
   RESIZE(float,LASTTILE->transform,SEQ_N);
@@ -377,6 +385,7 @@ void* shape(tilebase_cache_t self)
 { switch(E_TYPE)
   { case YAML_MAPPING_START_EVENT: 
       TRY(LASTTILE->shape=ndinit());
+      TRY(LASTTILE->crop=ndinit());
       return shape;
     case YAML_MAPPING_END_EVENT: return tile;
     case YAML_SCALAR_EVENT: 
@@ -387,6 +396,9 @@ void* shape(tilebase_cache_t self)
         return shape;
       } else if(KEY("dims"))
       { push(self,shape,dims);
+        return sequence_of_ints;
+      } else if(KEY("crop"))
+      { push(self,shape,crop);
         return sequence_of_ints;
       }
     default: return shape;
@@ -671,6 +683,8 @@ tilebase_cache_t TileBaseCacheWrite(tilebase_cache_t self, const char* path_, ti
       SCALAR(nd_type_to_str(tid)); EMIT;
       SCALAR("dims"); EMIT;
       emit_seq_sz(self,ndndim(TileShape(t)),dims);
+      SCALAR("crop"); EMIT;
+      emit_seq_sz(self,ndndim(TileCrop(t)),dims);
     MAP_END; EMIT;
     SCALAR("transform"); EMIT;
     emit_seq_f32(self,ntransform(ndndim(TileShape(t))),TileTransform(t));

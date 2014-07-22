@@ -159,6 +159,20 @@ Error:
   return 0;
 }
 
+/** \returns An empty (no data) nd_t array shapped according to the desired
+    crop for the tile. The returned array is still owned by the tile.
+
+    By default, this is just the full tile shape according to TileFile().
+    The cache file (or another utility) can change the shape as desired.
+*/
+nd_t TileCrop(tile_t self) {
+  if(!self->crop)
+    TRY(self->crop==ndioShape(TileFile(self)));
+  return self->crop;
+Error:
+  return 0;
+}
+
 /**
  * Computes the voxel size from the tile database for dimension \a idim.
  * Use AABBNDim(TileAABB(self)) to get the number of dimensions.

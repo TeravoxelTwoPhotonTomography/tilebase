@@ -9,6 +9,7 @@ struct _tile_t
 { aabb_t aabb;  ///< bounding box for the tile
   ndio_t file;  ///< opened file for reading
   nd_t   shape;
+  nd_t   crop;
   metadata_t meta; ///< handle to tile metadata.  Used to resolve filenames  
   float* transform;
   char   path[1024];

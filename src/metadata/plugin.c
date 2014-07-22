@@ -45,8 +45,10 @@
 //    Use the dirent (posix) interface for directory traversal.
 #ifdef _MSC_VER
 #include <windows.h>
+#include <Shlwapi.h>
 #include "dirent.win.h"                                     // use posix-style directory traversal
 const char* estring();
+#define dlerror(...) ("")
 #else // POSIX
 #include <dlfcn.h>
 #include <dirent.h>
@@ -285,6 +287,15 @@ Error:
   goto Finalize;
 }
 
+static unsigned is_path_relative(const char *path)
+{
+#ifdef _MSC_VER
+  return PathIsRelative(path); 
+#else
+  return path[0]!='/';
+#endif
+}
+
 /**
  * Recursively descends a directory tree starting at \a path searching for 
  * plugins to load.
@@ -309,6 +320,9 @@ metadata_apis_t MetadataLoadPlugins(const char *path, size_t *n)
   DIR*           dir;
   char *buf=0,
        *exepath=rpath();
+  if(!is_path_relative(path))
+  { buf=(char*)path;
+  } else
   { size_t n=strlen(exepath)+strlen(path)+2; // +1 for the directory seperator and +1 for the terminating null
     const char *p[]={exepath,"/",path};
     TRY(buf=(char*)alloca(n),"Out of stack space.");
@@ -321,6 +335,7 @@ metadata_apis_t MetadataLoadPlugins(const char *path, size_t *n)
   
   // Register loaded ndio plugins with loaded metadata plugins
   // to share across shared library boundaries.
+  ndioPreloadPlugins();
   { size_t i,n;
     ndio_fmt_t **ndio_plugins=ndioPlugins(&n);
     for(i=0;i<apis.n;++i)

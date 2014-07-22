@@ -20,12 +20,15 @@ void progress(const char *path, void* data)
   printf("."); fflush(stdout);
 }
 
+#define PLUGIN_PATH TILEBASE_INSTALL_PATH ## "\\bin\\plugins"
+
 int main(int argc, char *argv[])
 { char *fmt;
   size_t count=0;
   
   //ndioAddPluginPath("plugins");
-  ndioAddPluginPath(TILEBASE_INSTALL_PATH); // so installed plugins will be found from the build location
+  printf("%s\n",PLUGIN_PATH);
+  ndioAddPluginPath(PLUGIN_PATH); // so installed plugins will be found from the build location  
 
   if(argc<2)
   { printf("Usage: %s root-path [metadata-format]\n",basename(argv[0]));

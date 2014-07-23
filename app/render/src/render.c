@@ -36,7 +36,7 @@
 #define DEBUG
 #define PROFILE_MEMORY
 #define ENABLE_PROGRESS_OUTPUT
-// #define DEBUG_DUMP_IMAGES
+//#define DEBUG_DUMP_IMAGES
 #define PROFILE
 
 #ifdef DEBUG
@@ -559,6 +559,7 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!in)                                                                     // Alloc on first iteration: in, transform
     { unsigned n;
       in=ndheap(TileShape(tiles[i]));
+
       n=ndndim(in);
       if(!desc->transform)
         NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
@@ -579,7 +580,9 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
+    //DUMP("tile.%.tif",in);
     TRY(crop(ndPushShape(in),TileCrop(tiles[i])));
+    //DUMP("crop.%.tif",in);
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));

@@ -47,10 +47,10 @@ static size_t           g_countof_formats=0; ///< number of loaded metadata form
  * Find metadata formats and initialize \a g_formats. 
  * \todo make thread safe
  */
-#define PLUGIN_PATH (TILEBASE_INSTALL_PATH "/bin/" METADATA_PLUGIN_PATH)
+#define PLUGIN_PATH (TILEBASE_INSTALL_PATH "/bin/" METADATA_PLUGIN_PATH) // Warning: using this breaks relocatable package
 static int maybe_load_plugins()
 { if(g_formats) return 1;
-  TRY(g_formats=MetadataLoadPlugins(PLUGIN_PATH,&g_countof_formats));
+  TRY(g_formats=MetadataLoadPlugins(METADATA_PLUGIN_PATH /*PLUGIN_PATH*/,&g_countof_formats));
   return 1;
 Error:
   return 0;

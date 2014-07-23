@@ -2,6 +2,9 @@
  * \file
  * Metadata format protobuf-based v0.
  */
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning(disable:4244 4267)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <google/protobuf/io/coded_stream.h>
@@ -69,7 +72,7 @@ typedef google::protobuf::Message      desc_t;
 /// \todo protect globals with a mutex
 static int g_silent=0; ///< Use to turn logging to stderr on/off.
 
-#if 1
+#ifndef DEBUG
 static void toggle_silence() { g_silent=!g_silent; }
 #else
 static void toggle_silence() { }
@@ -381,7 +384,7 @@ unsigned pbufv8_get_transform(metadata_t self, float *transform)
 { pbufv8_t *ctx=(pbufv8_t*)MetadataContext(self);
 #if 1
   nd_t vol;
-  unsigned i,n;
+  unsigned n;
   int64_t shape[3],ori[3];
 
   ndio_t file;

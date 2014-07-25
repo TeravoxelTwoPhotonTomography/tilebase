@@ -10,7 +10,7 @@ include(FindPackageHandleStandardArgs)
 #set(PROTOBUF_URL http://dl.dropbox.com/u/782372/Software/protobuf-2.4.1.zip) 
 #set(PROTOBUF_MD5 ce3ef48c322ea14016fdf845219f386a)
 
-set(PROTOBUF_URL http://dl.dropboxusercontent.com/u/21394583/protobuf-2.5.0.zip)
+set(PROTOBUF_URL https://dl.dropboxusercontent.com/u/21394583/protobuf-2.5.0.zip)
 set(PROTOBUF_MD5 5aa55697be1e63c055720695a8e590bb)
 
 if(WIN32)
@@ -29,7 +29,7 @@ if(WIN32)
       URL_MD5 ${PROTOBUF_MD5}
       BUILD_IN_SOURCE 1
       LIST_SEPARATOR ^^
-      CONFIGURE_COMMAND ""#devenv /Upgrade /SafeMode /Command "Build.SolutionPlatforms x64" <SOURCE_DIR>/vsprojects/protobuf.sln
+      CONFIGURE_COMMAND ""
       BUILD_COMMAND msbuild /target:protoc /target:libprotobuf /p:Configuration=Debug /p:Platform=${PLAT} <SOURCE_DIR>/vsprojects/protobuf.sln
       INSTALL_COMMAND ""
     )
@@ -43,7 +43,9 @@ else()
     ExternalProject_Add(protobuf
       URL     ${PROTOBUF_URL}
       URL_MD5 ${PROTOBUF_MD5}
+      TLS_VERIFY OFF
       CONFIGURE_COMMAND <SOURCE_DIR>/configure;--prefix=<INSTALL_DIR>;--with-pic
+      LOG_DOWNLOAD 1
     )
   endif()
   set(PROP _EP_INSTALL_DIR)

@@ -488,6 +488,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
                   ndref(ndinit(),nddata(in),ndkind(in)),
                   ndtype(in)),
                 ndndim(in),ndshape(in)));
+  memcpy(ndstrides(ctx->carray),ndstrides(in),(ndndim(in)+1)*sizeof(size_t));
   ctx->dz_px=ndshape(ctx->carray)[2]/ctx->n;        // max size of each block.
   ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
@@ -580,9 +581,9 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
-    //DUMP("tile.%.tif",in);
+    DUMP("tile.%.tif",in);
     TRY(crop(ndPushShape(in),TileCrop(tiles[i])));
-    //DUMP("crop.%.tif",in);
+    DUMP("crop.%.tif",in);
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));

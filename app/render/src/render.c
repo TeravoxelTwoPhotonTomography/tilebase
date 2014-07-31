@@ -33,6 +33,8 @@
 
 #define REALLOC(T,e,N)  TRY((e)=realloc((e),sizeof(T)*(N)))
 
+#define TODO          LOG("TODO - %s(%d)\n",__FILE__,__LINE__,__FUNCTION__)
+
 #define DEBUG
 #define PROFILE_MEMORY
 #define ENABLE_PROGRESS_OUTPUT
@@ -52,7 +54,7 @@
 #endif
 
 #if defined(PROFILE_MEMORY) && HAVE_CUDA
-nd_t ndcuda_log(nd_t vol, void *s)
+static nd_t ndcuda_log(nd_t vol, void *s)
 { unsigned i;
   int idev;
   cudaGetDevice(&idev);
@@ -83,7 +85,7 @@ nd_t ndcuda_log(nd_t vol, void *s)
 
 static void breakme() {LOG(ENDL);}
 
-void dump(const char *filename,nd_t a)
+static void dump(const char *filename,nd_t a)
 { LOG("Writing %s"ENDL,filename);
   ndioClose(ndioWrite(ndioOpen(filename,NULL,"w"),a));
 }
@@ -180,18 +182,18 @@ static void affine_workspace__set_boundary_value(affine_workspace* ws,nd_t vol)
 { ws->params.boundary_value=boundary_value(vol);
 }
 
-static desc_t make_desc(tiles_t tiles, double voxel_um[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+static desc_t make_desc(const struct render *opts, tiles_t tiles, handler_t yield, void* args)
 { const float um2nm=1e3;
 
   desc_t out;
   memset(&out,0,sizeof(out));
   out.tiles=tiles;
-  out.x_nm=(float)(voxel_um[0]*um2nm);
-  out.y_nm=(float)(voxel_um[1]*um2nm);
-  out.z_nm=(float)(voxel_um[2]*um2nm);
+  out.x_nm=(float)(opts->voxel_um[0]*um2nm);
+  out.y_nm=(float)(opts->voxel_um[1]*um2nm);
+  out.z_nm=(float)(opts->voxel_um[2]*um2nm);
   out.voxvol_nm3=out.x_nm*out.y_nm*out.z_nm;
-  out.nchildren=nchildren;
-  out.countof_leaf=countof_leaf;
+  out.nchildren=opts->nchildren;
+  out.countof_leaf=opts->countof_leaf;
   out.args=args;
   out.yield=yield;
   filter_workspace__init(&out.fws);
@@ -400,26 +402,26 @@ Error:
  * \todo FIXME: assumes working with at-least-3d data.
  */
 #if 1
-nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws)
+static nd_t aafilt_child(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i=0,ndim=ndndim(vol);
   for(i=0;i<3;++i)
     TIME(TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i]))); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
-  DUMP("aafilt-vol.%.tif",vol);
+  DUMP("aafilt_child-vol.%.tif",vol);
   TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
-  DUMP("aafilt-src.%.tif",ws->gpu[0]);
+  DUMP("aafilt_child-src.%.tif",ws->gpu[0]);
   for(i=0;i<3;++i)
     TIME(TRY(ndconv1(ws->gpu[~i&1],ws->gpu[i&1],ws->filters[i],i,&ws->params)));
   ws->i=i&1; // this will be the index of the last destination buffer
-  DUMP("aafilt-dst.%.tif",ws->gpu[ws->i]);
+  DUMP("aafilt_child-dst.%.tif",ws->gpu[ws->i]);
   return ws->gpu[ws->i];
 Error:
   for(i=0;i<countof(ws->gpu);++i) if(nderror(ws->gpu[i]))
     LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(ws->gpu[i]));
   return 0;
 }
-#else // skip aafilt
-nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws) 
+#else // skip aafilt_child
+nd_t aafilt_child(nd_t vol, float *transform, filter_workspace *ws) 
 { TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
   TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
   ws->i=0;
@@ -430,7 +432,7 @@ Error:
 }
 #endif
 
-nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
+static nd_t xform(nd_t dst, nd_t src, float *transform, affine_workspace *ws)
 { TRY(affine_workspace__gpu_resize(ws,dst));
   TRY(ndref(ws->host_xform,transform,nd_heap));
   TRY(ndcopy(ws->gpu_xform,ws->host_xform,0,0));
@@ -462,6 +464,7 @@ typedef struct _subdiv_t
   float *transform;
   nd_t   carray;
 } *subdiv_t;
+
 static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,size_t total)
 { subdiv_t ctx=0;
 #if HAVE_CUDA
@@ -504,6 +507,7 @@ static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,siz
 Error:
   return 0;
 }
+
 static void free_subdiv(subdiv_t ctx)
 { if(ctx)
   { if(ctx->n>1)
@@ -513,8 +517,11 @@ static void free_subdiv(subdiv_t ctx)
     free(ctx);
   }
 };
+
 static nd_t subdiv_vol(subdiv_t ctx)       {return ctx->carray;}
+
 static float* subdiv_xform(subdiv_t ctx)   {return ctx->transform;}
+
 static int  next_subdivision(subdiv_t ctx)
 { if(++ctx->i<ctx->n)
   { TRY(ctx->n>1); // sanity check..remove once confirmed
@@ -567,7 +574,6 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
       TRY(set_ref_shape(desc,in));
       affine_workspace__set_boundary_value(&desc->aws,in);
 #if HAVE_CUDA
-
       if(desc->total==0)
         TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total));
 #endif
@@ -587,13 +593,19 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
-      TIME(TRY(t=aafilt(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
+      TIME(TRY(t=aafilt_child(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
       TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
     } while(next_subdivision(subdiv));
     free_subdiv(subdiv);
     TRY(in=ndPopShape(in));
     subdiv=0;
   } // end loop over tiles
+
+  TODO;
+  /* 
+  Antialiasing on the output.
+  */
+
 Finalize:
   PROGRESS(ENDL);
   ndfree(in);
@@ -623,7 +635,7 @@ static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_
   }
   // paste child into output
   box2box(desc->transform,out,bbox,child,cbox);
-  TRY(t=aafilt(child,desc->transform,&desc->fws));
+  TRY(t=aafilt_child(child,desc->transform,&desc->fws));
   TRY(xform(out,t,desc->transform,&desc->aws));
   return out;
 Error:
@@ -757,21 +769,18 @@ Error:
 }
 
 /**
+ * \param[in]   opts         Point to a `struct render` holding options that control the render.
  * \param[in]   tiles        Source tile database.
- * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
- * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
- * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
- * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
  * \param[in]   yield        Callback that handles nodes in the tree when they
  *                           are done being rendered.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned render(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+unsigned render(const struct render *opts, tiles_t tiles, handler_t yield, void* args)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
+  desc_t desc=make_desc(opts,tiles,yield,args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,opts->ori,opts->size));
   TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   desc.make(&desc,bbox,path);
@@ -786,21 +795,18 @@ Error:
 }
 
 /**
+ * \param[in]   opts         Point to a `struct render` holding options that control the render.
  * \param[in]   tiles        Source tile database.
- * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
- * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
- * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
- * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
  * \param[in]   yield        Callback that handles nodes in the tree when they
  *                           are ready.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned addresses(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void* args)
+unsigned addresses(const struct render *opts, tiles_t tiles, size_t countof_leaf, handler_t yield, void* args)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,args);
+  desc_t desc=make_desc(opts,tiles,yield,args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,opts->ori,opts->size));
 //TRY(preallocate(&desc,bbox));
   TRY(path=make_address());
   setup_print_addresses(&desc);
@@ -816,23 +822,20 @@ Error:
 }
 
 /**
+ * \param[in]   opts         Point to a `struct render` holding options that control the render.
  * \param[in]   tiles        Source tile database.
- * \param[in]   voxel_um     Desired voxel size of leaf nodes (x,y, and z).
- * \param[in]   ori          Output box origin as a fraction of the total bounding box (0 to 1; x,y and z).
- * \param[in]   size         Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
- * \param[in]   countof_leaf Maximum size of a leaf node array (in elements).
  * \param[in]   yield        Callback that handles nodes in the tree when they
  *                           are ready.
  * \param[in]   yield_args   Additional arguments to be passed to yeild.
  * \param[in]   loader       Function that loads the data at the node specified by an address.
  * \param[in]   target       The address of the tree to target.
  */
-unsigned render_target(tiles_t tiles, double voxel_um[3], double ori[3], double size[3], size_t nchildren, size_t countof_leaf, handler_t yield, void *yield_args, loader_t loader, address_t target)
+unsigned render_target(const struct render *opts, tiles_t tiles, handler_t yield, void *yield_args, loader_t loader, address_t target)
 { unsigned ok=1;
-  desc_t desc=make_desc(tiles,voxel_um,nchildren,countof_leaf,yield,yield_args);
+  desc_t desc=make_desc(opts,tiles,yield,yield_args);
   aabb_t bbox=0;
   address_t path=0;
-  TRY(bbox=AdjustTilesBoundingBox(tiles,ori,size));
+  TRY(bbox=AdjustTilesBoundingBox(tiles,opts->ori,opts->size));
   TRY(preallocate_for_render_one_target(&desc,bbox));
   TRY(path=make_address());
   target__setup(&desc,target,loader);

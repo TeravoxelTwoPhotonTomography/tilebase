@@ -85,7 +85,7 @@ static unsigned print_addr(nd_t v, address_t address, aabb_t bbox, void* args)
   return 0;
 }
 
-unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
+static unsigned save(nd_t vol, address_t address, aabb_t bbox, void* args)
 { char full[1024]={0},
        path[1024]={0};
   size_t n;
@@ -163,7 +163,7 @@ Error:
 }
 
 
-unsigned save_raveler(nd_t vol, address_t address, aabb_t bbox, void* args)
+static unsigned save_raveler(nd_t vol, address_t address, aabb_t bbox, void* args)
 { char full[1024]={0},
        path[1024]={0};
   size_t n;
@@ -195,7 +195,7 @@ Error:
   goto Finalize;
 }
 
-nd_t load(address_t address)
+static nd_t load(address_t address)
 { char full[1024]={0},
        path[1024]={0};
   size_t n;
@@ -221,7 +221,7 @@ Error:
 }
 
 
-uint64_t nextpow2(uint64_t v)
+static uint64_t nextpow2(uint64_t v)
 { v--;
   v |= v >> 1;
   v |= v >> 2;
@@ -232,16 +232,30 @@ uint64_t nextpow2(uint64_t v)
   return ++v;
 }
 
+static void set_render_opts(struct render* opts)
+{
+#define CPY(d,s) memcpy(opts->d,&OPTS.s,sizeof(opts->d));
+  CPY(voxel_um,x_um);
+  CPY(ori     ,ox);
+  CPY(size    ,lx);
+#undef CPY
+  opts->countof_leaf=OPTS.countof_leaf;
+  opts->nchildren   =OPTS.nchildren;
+}
+
+
 int main(int argc, char* argv[])
 { unsigned ecode=0;
   tiles_t tiles=0;
   handler_t on_ready=save;
+  struct render render_opts={0};
   ndioAddPluginPath("plugins");             // search this path for plugins (relative to executable)
   ndioAddPluginPath(TILEBASE_INSTALL_PATH); // so installed plugins will be found from the build location
   { int isok=0;
     OPTS=parseargs(&argc,&argv,&isok);
     TRY(isok);
   }
+  set_render_opts(&render_opts);
   fprintf(stderr,"GPU: %d\n",(int)(OPTS.gpu_id));
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
@@ -284,18 +298,18 @@ int main(int argc, char* argv[])
 
   if(OPTS.flag_print_addresses)
   { target_bbox(tiles);
-    TRY(addresses(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,print_addr,stdout));
+    TRY(addresses(&render_opts,tiles,print_addr,stdout));
     goto Finalize;
   }
 
   if(OPTS.target)
   { printf("RENDERING TARGET: ");
     print_addr(0,OPTS.target,0,stdout);
-    TRY(render_target(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL,load,OPTS.target));
+    TRY(render_target(&render_opts,tiles,on_ready,NULL,load,OPTS.target));
     goto Finalize;
   }
 
-  TRY(render(tiles,&OPTS.x_um,&OPTS.ox,&OPTS.lx,OPTS.nchildren,OPTS.countof_leaf,on_ready,NULL));
+  TRY(render(&render_opts,tiles,on_ready,NULL));
 
 Finalize:
   TileBaseClose(tiles);

@@ -273,8 +273,8 @@ int main(int argc, char* argv[])
     TRY(AABBGet(bbox,0,0,&shape));
     DBG("NANOMETERS (%15lld,%15lld,%15lld)\n",(long long)shape[0],(long long)shape[1],(long long)shape[2]);
     DBG("PIXELS     (%15f,%15f,%15f)\n",((double)shape[0])/1000.0/OPTS.x_um,
-                                           ((double)shape[1])/1000.0/OPTS.y_um,
-                                           ((double)shape[2])/1000.0/OPTS.z_um);
+                                        ((double)shape[1])/1000.0/OPTS.y_um,
+                                        ((double)shape[2])/1000.0/OPTS.z_um);
     // expand bounds to next power of 2 in pixels along the x and y dimension.  Make the x and y extent. the same number of pixels.
     s=max(shape[0],shape[1]);
     TRY(OPTS.x_um==OPTS.y_um);

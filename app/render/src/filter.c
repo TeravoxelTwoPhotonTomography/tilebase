@@ -74,11 +74,11 @@ static size_t gaussian_filter_radius(float sigma, float threshold)
 { return ceil(_invnorm(threshold,0,sigma));
 }
 
-nd_t make_aa_filter(float scale,nd_t workspace)
+nd_t make_aa_filter(float scale,float scale_thresh,nd_t workspace)
 { nd_t out=workspace;  
   size_t r,n; //filter radius, size
-  scale=0.5*fabs(scale); // this is the sigma that gets used...the divisor is pretty arbitrary
-  //if(scale<=1.0f) return 0; // no filter needed
+  scale=0.5*fabs(scale); // this is the sigma that gets used...the divisor is pretty arbitrary..0.5 should be turkowski's half gausian
+  if(scale<=scale_thresh) return 0; // no filter needed
   r=gaussian_filter_radius(scale,0.01);
   n=2*r+1;
   if(!out)

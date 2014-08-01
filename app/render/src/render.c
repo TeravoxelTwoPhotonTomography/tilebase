@@ -11,6 +11,7 @@
 #include "filter.h"
 #include "xform.h"
 #include "address.h"
+#include "subdiv.h"
 #include <math.h> //for sqrt
 #include "tictoc.h" // for profiling
 #if HAVE_CUDA
@@ -95,6 +96,7 @@ static void dump(const char *filename,nd_t a)
 typedef struct _filter_workspace
 { nd_t filters[3];  ///< filter for each axis
   nd_t gpu[2];      ///< double buffer on gpu for serial seperable convolutions
+  float scale_thresh;
   unsigned capacity;///< capacity of alloc'd gpu buffers
   unsigned i;       ///< current gpu buffer
   nd_conv_params_t params;
@@ -153,6 +155,7 @@ static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_
 static void filter_workspace__init(filter_workspace *ws)
 { memset(ws,0,sizeof(*ws));
   ws->params.boundary_condition=nd_boundary_replicate;
+  ws->scale_thresh=0.5f;
 }
 
 static void affine_workspace__init(affine_workspace *ws)
@@ -197,6 +200,7 @@ static desc_t make_desc(const struct render *opts, tiles_t tiles, handler_t yiel
   out.args=args;
   out.yield=yield;
   filter_workspace__init(&out.fws);
+  out.fws.scale_thresh=opts->input_filter_scale_thresh;
   affine_workspace__init(&out.aws);
 
   out.make=render_child;
@@ -405,7 +409,7 @@ Error:
 static nd_t aafilt_child(nd_t vol, float *transform, filter_workspace *ws)
 { unsigned i=0,ndim=ndndim(vol);
   for(i=0;i<3;++i)
-    TIME(TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->filters[i]))); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
+    TIME(TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->scale_thresh,ws->filters[i]))); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
   TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
   DUMP("aafilt_child-vol.%.tif",vol);
   TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
@@ -453,102 +457,12 @@ static int any_tiles_in_box(tile_t *tiles, size_t ntiles, aabb_t bbox)
   return 0;
 }
 
-/*
-   Tile split for limited memory on the gpu.
-   Division is linearly spaced on z.
-*/
-typedef struct _subdiv_t
-{ int i,n,d;      // i is subdiv index, n is number of subdivs, d is dimension of input
-  int64_t dz_px,zmax;
-  int64_t *dz_nm; // displacement vector for each slice
-  float *transform;
-  nd_t   carray;
-} *subdiv_t;
-
-static subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,size_t total)
-{ subdiv_t ctx=0;
-#if HAVE_CUDA
-  TRY(ndndim(in)>=3); // assume there's a z.
-  NEW(struct _subdiv_t,ctx,1);
-  ZERO(struct _subdiv_t,ctx,1);
-#define CEIL(num,den) (((num)+(den)-1)/(den))
-
- // TRY(cudaSuccess==cudaMemGetInfo(&free,&total));
-  ctx->n=(int)(CEIL(ndnbytes(in)*2,free)); /* need 2 copies of the subarray. This is a ceil of req.bytes/free.bytes */
-#undef CEIL
-  TRY(ctx->n<ndshape(in)[2]);
-
-  ctx->transform=(float*)malloc((ndim+1)*(ndim+1)*sizeof(float));
-  memcpy(ctx->transform,transform,(ndim+1)*(ndim+1)*sizeof(float));
-  ctx->d=ndim;
-  ctx->zmax =ndshape(in)[2];
-  if(ctx->n==1) // nothing to do - single iteration
-  { ctx->carray=in;
-    return ctx;
-  }
-  TRY(ctx->carray=ndreshape(
-                ndcast(
-                  ndref(ndinit(),nddata(in),ndkind(in)),
-                  ndtype(in)),
-                ndndim(in),ndshape(in)));
-  memcpy(ndstrides(ctx->carray),ndstrides(in),(ndndim(in)+1)*sizeof(size_t));
-  ctx->dz_px=ndshape(ctx->carray)[2]/ctx->n;        // max size of each block.
-  ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
-  ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
-  LOG("\t%5s: %10d\n" "\t%5s: %10d\n","n",(int)ctx->n,"dz_px",(int)ctx->dz_px);
-  {
-    int r;
-    ctx->dz_nm=(int64_t*)calloc(ndim+1,sizeof(int64_t));
-    for(r=0;r<(ndim+1);++r)
-      ctx->dz_nm[r]=ctx->dz_px*transform[(ndim+1)*r+2];
-  }
-  return ctx;
-#endif
-Error:
-  return 0;
-}
-
-static void free_subdiv(subdiv_t ctx)
-{ if(ctx)
-  { if(ctx->n>1)
-      ndfree(ndref(ctx->carray,0,nd_unknown_kind));
-    free(ctx->transform);
-    free(ctx->dz_nm);
-    free(ctx);
-  }
-};
-
-static nd_t subdiv_vol(subdiv_t ctx)       {return ctx->carray;}
-
-static float* subdiv_xform(subdiv_t ctx)   {return ctx->transform;}
-
-static int  next_subdivision(subdiv_t ctx)
-{ if(++ctx->i<ctx->n)
-  { TRY(ctx->n>1); // sanity check..remove once confirmed
-    if((ctx->i+1)*ctx->dz_px>ctx->zmax) {// adjust last block if necessary
-      int z=ctx->zmax-ctx->i*ctx->dz_px;
-      if(z<=0) return 0; // wtf
-      ndshape(ctx->carray)[2]=z; // don't adjust strides, will get copied to a correctly formatted array on the gpu
-    }
-    ndoffset(ctx->carray,2,ctx->dz_px);
-    { int i;
-      const int n=ctx->d+1;
-      for(i=0;i<n;++i)
-        ctx->transform[n*i+(n-1)]+=ctx->dz_nm[i];
-    }
-    return 1;
-  }
-Error:
-  return 0;
-}
-
 static unsigned crop(nd_t vol,nd_t crop) {
   if(ndndim(vol)!=ndndim(crop))
     return 0;
   memcpy(ndshape(vol),ndshape(crop),ndndim(vol)*sizeof(size_t));
   return 1;
 }
-
 
 /**
  * Does not assume all tiles have the same size. (fixed: ngc)

@@ -18,6 +18,8 @@ struct render {
            size[3];      ///< Output box width as a fraction of the total bounding box (0 to 1; x, y and z).
     size_t countof_leaf; ///< Maximum size of a leaf node array (in elements).
     size_t nchildren;    ///< number of children per node
+
+    float input_filter_scale_thresh; ///< scale threshold for applying input prefiltering.  Scale is (input pixel size)/(output pixel size).
 };
 
 

@@ -273,9 +273,9 @@ static int  set_fov_x_um(opts_t *ctx,const char *s)     {ctx->fov_x_um=strtod(s,
 static int  set_fov_y_um(opts_t *ctx,const char *s)     {ctx->fov_y_um=strtod(s,0);                          return 1;}
 static int  set_input_scale_thresh(opts_t *ctx, const char *s)  {ctx->input_filter_scale_thresh  = (float)strtod(s,0); return 1;}
 static int  set_output_scale_thresh(opts_t *ctx, const char *s) {ctx->output_filter_scale_thresh = (float)strtod(s,0); return 1;}
-static int  set_output_filter_x_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[0]   = (float)strtod(s,0); return 1;}
-static int  set_output_filter_y_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[1]   = (float)strtod(s,0); return 1;}
-static int  set_output_filter_z_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[2]   = (float)strtod(s,0); return 1;}
+static int  set_output_filter_x_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[0]   = 1000.0f*(float)strtod(s,0); return 1;}
+static int  set_output_filter_y_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[1]   = 1000.0f*(float)strtod(s,0); return 1;}
+static int  set_output_filter_z_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[2]   = 1000.0f*(float)strtod(s,0); return 1;}
 
 
 //-- HANDLING ------------------------------------------------------------------

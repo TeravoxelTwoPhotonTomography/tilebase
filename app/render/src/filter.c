@@ -74,24 +74,23 @@ static size_t gaussian_filter_radius(float sigma, float threshold)
 { return ceil(_invnorm(threshold,0,sigma));
 }
 
-nd_t make_aa_filter(float scale,float scale_thresh,nd_t workspace)
+nd_t make_aa_filter(float scale,float size, float size_thresh,nd_t workspace)
 { nd_t out=workspace;  
   size_t r,n; //filter radius, size
-  scale=0.5*fabs(scale); // this is the sigma that gets used...the divisor is pretty arbitrary..0.5 should be turkowski's half gausian
-  if(scale<=scale_thresh) return 0; // no filter needed
-  r=gaussian_filter_radius(scale,0.01);
+  size=scale*fabs(size); // this is the sigma that gets used...the divisor is pretty arbitrary..scale==0.5 should be turkowski's half gausian
+  if(size<=size_thresh) return 0; // no filter needed
+  r=gaussian_filter_radius(size,0.01);
   n=2*r+1;
   if(!out)
     TRY(ndreshapev(ndcast(ndref(out=ndinit(),malloc(n*sizeof(float)),nd_heap),nd_f32),1,n));
   if(ndnelem(out)<n)
     TRY(ndreshapev(ndref(out,realloc(nddata(out),n*sizeof(float)),nd_heap),1,n));
   linspace(out,-(float)r,r);
-  normpdf(out,0.0f,scale);
+  normpdf(out,0.0f,size);
 #if 0
   ndioClose(ndioWrite(ndioOpen("filter.h5",0,"w"),out));
 #endif
   return out;
 Error:
   return 0;
-
 }

@@ -241,6 +241,16 @@ static void set_render_opts(struct render* opts)
 #undef CPY
   opts->countof_leaf=OPTS.countof_leaf;
   opts->nchildren   =OPTS.nchildren;
+
+  opts->input_filter_scale_thresh=OPTS.input_filter_scale_thresh;
+
+  opts->output_filter_scale_thresh=OPTS.output_filter_scale_thresh;
+
+  // artificial data: 1px == 1nm
+  opts->output_filter_size_nm[0]=OPTS.output_filter_size_nm[0];
+  opts->output_filter_size_nm[1]=OPTS.output_filter_size_nm[1];
+  opts->output_filter_size_nm[2]=OPTS.output_filter_size_nm[2];
+
 }
 
 

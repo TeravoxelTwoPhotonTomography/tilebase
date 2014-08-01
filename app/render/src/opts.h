@@ -34,6 +34,12 @@ typedef struct _opts_t
   double    fov_y_um;
 
   unsigned  flag_output_ortho;
+
+  // input/output filtering
+  float input_filter_scale_thresh; ///< scale threshold for applying input prefiltering.  Scale is (input pixel size)/(output pixel size).
+  float output_filter_scale_thresh; ///< scale threshold (px) for applying post-filtering to output leaves.
+  float output_filter_size_nm[3];  ///< post-filter size for x,y,z at the leaf level.
+  
 #if 0  // TODO
   unsigned  flag_adjust_contrast;
   double    contrast_min;

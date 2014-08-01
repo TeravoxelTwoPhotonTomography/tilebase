@@ -78,37 +78,42 @@ typedef struct _arg_t
 static void help(opts_t *opts);
 static int  validate_path(const char* s);
 static int  is_valid_output(const char* s);
-static int  is_human_readible_size(const char* s); // [ ] TODO
+static int  is_human_readible_size(const char* s);
 static int  is_double(const char *s);
-static int  is_zero_to_one(const char* s);         // [ ] TODO
-static int  is_four_or_eight(const char* s);       // [ ] TODO
-static int  is_address(const char* s);             // [ ] TODO
-static int  is_metadata_fmt(const char* s);        // [ ] TODO
+static int  is_zero_to_one(const char* s);
+static int  is_four_or_eight(const char* s);
+static int  is_address(const char* s);
+static int  is_metadata_fmt(const char* s);
 static int  is_positive_int(const char* s);
 
 static void set_print_addresses(opts_t *ctx);
 static void set_raveler_output(opts_t *ctx);
 static void set_output_ortho(opts_t *ctx);
 
-static int  set_address(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_gpu(opts_t *ctx,const char *s); // [ ] TODO
+static int  set_address(opts_t *ctx,const char *s);
+static int  set_gpu(opts_t *ctx,const char *s);
 static int  set_source_path(opts_t *ctx,const char *s);
 static int  set_output_path(opts_t *ctx,const char *s);
-static int  set_dest_file(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_metadata_fmt(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_x_um(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_y_um(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_z_um(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_ox(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_oy(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_oz(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_lx(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_ly(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_lz(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_nchildren(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_leaf_sz(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_fov_x_um(opts_t *ctx,const char *s); // [ ] TODO
-static int  set_fov_y_um(opts_t *ctx,const char *s); // [ ] TODO
+static int  set_dest_file(opts_t *ctx,const char *s);
+static int  set_metadata_fmt(opts_t *ctx,const char *s);
+static int  set_x_um(opts_t *ctx,const char *s);
+static int  set_y_um(opts_t *ctx,const char *s);
+static int  set_z_um(opts_t *ctx,const char *s);
+static int  set_ox(opts_t *ctx,const char *s);
+static int  set_oy(opts_t *ctx,const char *s);
+static int  set_oz(opts_t *ctx,const char *s);
+static int  set_lx(opts_t *ctx,const char *s);
+static int  set_ly(opts_t *ctx,const char *s);
+static int  set_lz(opts_t *ctx,const char *s);
+static int  set_nchildren(opts_t *ctx,const char *s);
+static int  set_leaf_sz(opts_t *ctx,const char *s);
+static int  set_fov_x_um(opts_t *ctx,const char *s);
+static int  set_fov_y_um(opts_t *ctx,const char *s);
+static int  set_input_scale_thresh(opts_t *ctx, const char *s);
+static int  set_output_scale_thresh(opts_t *ctx, const char *s);
+static int  set_output_filter_x_um(opts_t *ctx, const char *s);
+static int  set_output_filter_y_um(opts_t *ctx, const char *s);
+static int  set_output_filter_z_um(opts_t *ctx, const char *s);
 
 static int    ARGC;
 static char** ARGV;
@@ -150,9 +155,14 @@ static opt_t SPEC[]=
         "Examples:\n"
         "  128k \n"
         "  0.5G \n",{0}},
-  {is_double,       set_fov_x_um,     NULL,               0, "-fov_x_um", NULL,       "-1.0", "If positive, override the size of the field of view for each tile along the x direction.",{0}},
-  {is_double,       set_fov_y_um,     NULL,               0, "-fov_y_um", NULL,       "-1.0", "If positive, override the size of the field of view for each tile along the y direction.",{0}},
+  {is_double,       set_fov_x_um,     NULL,               0, "-fov_x_um", NULL,            "-1.0", "If positive, override the size of the field of view for each tile along the x direction.",{0}},
+  {is_double,       set_fov_y_um,     NULL,               0, "-fov_y_um", NULL,            "-1.0", "If positive, override the size of the field of view for each tile along the y direction.",{0}},
 
+  {is_double,       set_input_scale_thresh,   NULL,       0, "--input-filter-scale-threshold", NULL, "0.25"  , "Skip input filtering if the scale is below this threshold.",{0}},
+  {is_double,       set_output_scale_thresh,  NULL,       0, "--output-filter-scale-threshold", NULL, "0.25", "Skip output filtering if the scale is below this threshold.",{0}},
+  {is_double,       set_output_filter_x_um,   NULL,       0, "-fx", "--output-filter-x-um", "0.0", "Filter output with a gaussian of size x "MU"m.",{0}},
+  {is_double,       set_output_filter_y_um,   NULL,       0, "-fy", "--output-filter-y-um", "0.0", "Filter output with a gaussian of size y "MU"m.",{0}},
+  {is_double,       set_output_filter_z_um,   NULL,       0, "-fz", "--output-filter-z-um", "0.0", "Filter output with a gaussian of size z "MU"m.",{0}},
 };
 
 static arg_t ARGS[]= // position based arguments
@@ -243,26 +253,29 @@ static int  set_address(opts_t *ctx,const char *s) // assumes validated
 static void set_print_addresses(opts_t *ctx) {ctx->flag_print_addresses=1;}
 static void set_raveler_output(opts_t *ctx)  {ctx->flag_raveler_output=1;}
 static void set_output_ortho(opts_t *ctx)    {ctx->flag_output_ortho=1;}
-static int  set_gpu(opts_t *ctx,const char *s)          {ctx->gpu_id=strtol(s,0,10);                    return 1;}
-static int  set_source_path(opts_t *ctx,const char *s)  {ctx->src=s;                                    return 1;}
-static int  set_output_path(opts_t *ctx,const char *s)  {ctx->dst=s;                                    return 1;}
-static int  set_dest_file(opts_t *ctx,const char *s)    {ctx->dst_pattern=s;                            return 1;}
-static int  set_metadata_fmt(opts_t *ctx,const char *s) {ctx->src_format=s;                             return 1;}
-static int  set_x_um(opts_t *ctx,const char *s)         {ctx->x_um=strtod(s,0);                         return 1;}
-static int  set_y_um(opts_t *ctx,const char *s)         {ctx->y_um=strtod(s,0);                         return 1;}
-static int  set_z_um(opts_t *ctx,const char *s)         {ctx->z_um=strtod(s,0);                         return 1;}
-static int  set_ox(opts_t *ctx,const char *s)           {ctx->ox=strtod(s,0);                           return 1;}
-static int  set_oy(opts_t *ctx,const char *s)           {ctx->oy=strtod(s,0);                           return 1;}
-static int  set_oz(opts_t *ctx,const char *s)           {ctx->oz=strtod(s,0);                           return 1;}
-static int  set_lx(opts_t *ctx,const char *s)           {ctx->lx=strtod(s,0);                           return 1;}
-static int  set_ly(opts_t *ctx,const char *s)           {ctx->ly=strtod(s,0);                           return 1;}
-static int  set_lz(opts_t *ctx,const char *s)           {ctx->lz=strtod(s,0);                           return 1;}
-static int  set_nchildren(opts_t *ctx,const char *s)    {ctx->nchildren=strtol(s,0,10);                 return 1;}
-static int  set_leaf_sz(opts_t *ctx,const char *s)      {set_human_readible_size(s,&ctx->countof_leaf); return 1;}
-static int  set_fov_x_um(opts_t *ctx,const char *s)     {ctx->fov_x_um=strtod(s,0);                     return 1;}
-static int  set_fov_y_um(opts_t *ctx,const char *s)     {ctx->fov_y_um=strtod(s,0);                     return 1;}
-
-
+static int  set_gpu(opts_t *ctx,const char *s)          {ctx->gpu_id=strtol(s,0,10);                         return 1;}
+static int  set_source_path(opts_t *ctx,const char *s)  {ctx->src=s;                                         return 1;}
+static int  set_output_path(opts_t *ctx,const char *s)  {ctx->dst=s;                                         return 1;}
+static int  set_dest_file(opts_t *ctx,const char *s)    {ctx->dst_pattern=s;                                 return 1;}
+static int  set_metadata_fmt(opts_t *ctx,const char *s) {ctx->src_format=s;                                  return 1;}
+static int  set_x_um(opts_t *ctx,const char *s)         {ctx->x_um=strtod(s,0);                              return 1;}
+static int  set_y_um(opts_t *ctx,const char *s)         {ctx->y_um=strtod(s,0);                              return 1;}
+static int  set_z_um(opts_t *ctx,const char *s)         {ctx->z_um=strtod(s,0);                              return 1;}
+static int  set_ox(opts_t *ctx,const char *s)           {ctx->ox=strtod(s,0);                                return 1;}
+static int  set_oy(opts_t *ctx,const char *s)           {ctx->oy=strtod(s,0);                                return 1;}
+static int  set_oz(opts_t *ctx,const char *s)           {ctx->oz=strtod(s,0);                                return 1;}
+static int  set_lx(opts_t *ctx,const char *s)           {ctx->lx=strtod(s,0);                                return 1;}
+static int  set_ly(opts_t *ctx,const char *s)           {ctx->ly=strtod(s,0);                                return 1;}
+static int  set_lz(opts_t *ctx,const char *s)           {ctx->lz=strtod(s,0);                                return 1;}
+static int  set_nchildren(opts_t *ctx,const char *s)    {ctx->nchildren=strtol(s,0,10);                      return 1;}
+static int  set_leaf_sz(opts_t *ctx,const char *s)      {set_human_readible_size(s,&ctx->countof_leaf);      return 1;}
+static int  set_fov_x_um(opts_t *ctx,const char *s)     {ctx->fov_x_um=strtod(s,0);                          return 1;}
+static int  set_fov_y_um(opts_t *ctx,const char *s)     {ctx->fov_y_um=strtod(s,0);                          return 1;}
+static int  set_input_scale_thresh(opts_t *ctx, const char *s)  {ctx->input_filter_scale_thresh  = (float)strtod(s,0); return 1;}
+static int  set_output_scale_thresh(opts_t *ctx, const char *s) {ctx->output_filter_scale_thresh = (float)strtod(s,0); return 1;}
+static int  set_output_filter_x_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[0]   = (float)strtod(s,0); return 1;}
+static int  set_output_filter_y_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[1]   = (float)strtod(s,0); return 1;}
+static int  set_output_filter_z_um(opts_t *ctx, const char *s)  {ctx->output_filter_size_nm[2]   = (float)strtod(s,0); return 1;}
 
 
 //-- HANDLING ------------------------------------------------------------------

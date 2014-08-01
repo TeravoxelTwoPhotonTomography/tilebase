@@ -4,6 +4,11 @@
  *
  * \todo refactor to sepererate tree traversal from the rendering bits.
  */
+
+// C4090: const correctness -- should fix
+// C4244: floating to integral type conversion
+#pragma warning(disable:4244 4090)
+
 #include <app/render/config.h>
 #include <stdio.h>
 #include <string.h>
@@ -96,6 +101,7 @@ static void dump(const char *filename,nd_t a)
 typedef struct _filter_workspace
 { nd_t filters[3];  ///< filter for each axis
   nd_t gpu[2];      ///< double buffer on gpu for serial seperable convolutions
+  int enable[3];    ///< enable filtering for the corresponding axis
   float scale_thresh;
   unsigned capacity;///< capacity of alloc'd gpu buffers
   unsigned i;       ///< current gpu buffer
@@ -123,7 +129,8 @@ struct _desc_t
   int  nbufs;
   nd_t *bufs; //Need 1 for each node on path in tree - so pathlength(root,leaf)
   int  *inuse;
-  filter_workspace fws;
+  filter_workspace input_fws;
+  filter_workspace output_fws;
   affine_workspace aws;
   float *transform;
   size_t free,total;
@@ -151,10 +158,12 @@ struct _desc_t
 static nd_t render_child(desc_t *desc, aabb_t bbox, address_t path);
 static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path);
 static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_t child, aabb_t cbox, nd_t workspace);
+static int compute_output_filters(filter_workspace *ws, float sx, float sy, float sz);
+
 
 static void filter_workspace__init(filter_workspace *ws)
 { memset(ws,0,sizeof(*ws));
-  ws->params.boundary_condition=nd_boundary_replicate;
+  ws->params.boundary_condition=nd_boundary_replicate;  
   ws->scale_thresh=0.5f;
 }
 
@@ -199,8 +208,16 @@ static desc_t make_desc(const struct render *opts, tiles_t tiles, handler_t yiel
   out.countof_leaf=opts->countof_leaf;
   out.args=args;
   out.yield=yield;
-  filter_workspace__init(&out.fws);
-  out.fws.scale_thresh=opts->input_filter_scale_thresh;
+  filter_workspace__init(&out.input_fws);
+  out.input_fws.scale_thresh=opts->input_filter_scale_thresh;
+
+  filter_workspace__init(&out.output_fws);
+  out.output_fws.scale_thresh=opts->output_filter_scale_thresh;
+  compute_output_filters(&out.output_fws,
+      opts->output_filter_size_nm[0]/(float)out.x_nm,
+      opts->output_filter_size_nm[1]/(float)out.y_nm,
+      opts->output_filter_size_nm[2]/(float)out.z_nm);
+
   affine_workspace__init(&out.aws);
 
   out.make=render_child;
@@ -367,13 +384,7 @@ static unsigned filter_workspace__gpu_resize(filter_workspace *ws, nd_t vol)
     TRY(ws->gpu[1]=NDCUDA(vol,0));
     ws->capacity=(unsigned)ndnbytes(ws->gpu[0]);
   }
-#if 0 //don't need this because ndCudaSyncShape sets capacity if necessary
-  if(ws->capacity<ndnbytes(vol))
-  { TRY(ndCudaSetCapacity(ws->gpu[0],ndnbytes(vol)));
-    TRY(ndCudaSetCapacity(ws->gpu[1],ndnbytes(vol)));
-    ws->capacity=ndnbytes(vol);
-  }
-#endif
+
   if(!same_shape(ws->gpu[0],vol))
   { ndreshape(ws->gpu[0],ndndim(vol),ndshape(vol));
     ndreshape(ws->gpu[1],ndndim(vol),ndshape(vol));
@@ -398,6 +409,40 @@ Error:
   return 0;
 }
 
+static int compute_aa_filters(filter_workspace *ws, float *transform, size_t ndim) 
+{
+  unsigned i=0;
+  for(i=0;i<3;++i) {
+    nd_t f=0;
+    // ndim+1 for width of transform matrix, ndim+2 to address diagonals
+    TIME(f=make_aa_filter(0.5f,transform[i*(ndim+2)],ws->scale_thresh,ws->filters[i]));
+    ws->enable[i] = (f!=NULL);
+    if(f)
+      ws->filters[i]=f;
+  }
+  return 1;
+Error:
+  return 0;
+}
+
+static int compute_output_filters(filter_workspace *ws, float sx, float sy, float sz)
+{ nd_t f=0;
+  TIME(f=make_aa_filter(1.0f,sx,ws->scale_thresh,ws->filters[0]));
+  ws->enable[0]=(f!=NULL);
+  if(f) ws->filters[0]=f;
+  
+  TIME(f=make_aa_filter(1.0f,sy,ws->scale_thresh,ws->filters[1]));
+  ws->enable[1]=(f!=NULL);
+  if(f) ws->filters[1]=f;
+
+  TIME(f=make_aa_filter(1.0f,sz,ws->scale_thresh,ws->filters[2]));
+  ws->enable[2]=(f!=NULL);
+  if(f) ws->filters[2]=f;
+  return 1;
+Error:
+  return 0;
+}
+
 /**
  * Anti-aliasing filter. Uses seperable convolutions.
  * Uses double-buffering.  The two buffers are tracked by the filter_workspace.
@@ -406,26 +451,28 @@ Error:
  * \todo FIXME: assumes working with at-least-3d data.
  */
 #if 1
-static nd_t aafilt_child(nd_t vol, float *transform, filter_workspace *ws)
-{ unsigned i=0,ndim=ndndim(vol);
-  for(i=0;i<3;++i)
-    TIME(TRY(ws->filters[i]=make_aa_filter(transform[i*(ndim+2)],ws->scale_thresh,ws->filters[i]))); // ndim+1 for width of transform matrix, ndim+2 to address diagonals
+static nd_t aafilt(nd_t vol, filter_workspace *ws)
+{ 
+  unsigned i=0,j,ndim=ndndim(vol);
   TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
-  DUMP("aafilt_child-vol.%.tif",vol);
+  DUMP("aafilt-vol.%.tif",vol);
   TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
-  DUMP("aafilt_child-src.%.tif",ws->gpu[0]);
-  for(i=0;i<3;++i)
-    TIME(TRY(ndconv1(ws->gpu[~i&1],ws->gpu[i&1],ws->filters[i],i,&ws->params)));
-  ws->i=i&1; // this will be the index of the last destination buffer
-  DUMP("aafilt_child-dst.%.tif",ws->gpu[ws->i]);
+  DUMP("aafilt-src.%.tif",ws->gpu[0]);
+  for(i=0,j=0;i<3;++i)
+    if(ws->enable[i]) 
+    { TIME(TRY(ndconv1(ws->gpu[~j&1],ws->gpu[j&1],ws->filters[j],j,&ws->params)));
+      ++j;
+    }
+  ws->i=j&1; // this will be the index of the last destination buffer
+  DUMP("aafilt-dst.%.tif",ws->gpu[ws->i]);
   return ws->gpu[ws->i];
 Error:
   for(i=0;i<countof(ws->gpu);++i) if(nderror(ws->gpu[i]))
     LOG("\t[nd Error]:"ENDL "\t%s"ENDL,nderror(ws->gpu[i]));
   return 0;
 }
-#else // skip aafilt_child
-nd_t aafilt_child(nd_t vol, float *transform, filter_workspace *ws) 
+#else // skip aafilt
+nd_t aafilt(nd_t vol, float *transform, filter_workspace *ws) 
 { TIME(TRY(filter_workspace__gpu_resize(ws,vol)));
   TIME(TRY(ndcopy(ws->gpu[0],vol,0,0)));
   ws->i=0;
@@ -503,11 +550,12 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
     DUMP("tile.%.tif",in);
     TRY(crop(ndPushShape(in),TileCrop(tiles[i])));
-    DUMP("crop.%.tif",in);
+    DUMP("crop.%.tif",in);    
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
-      TIME(TRY(t=aafilt_child(subdiv_vol(subdiv),desc->transform,&desc->fws)));                         // t is on the gpu
+      TRY(compute_aa_filters(&desc->input_fws,desc->transform,ndndim(in)));
+      TIME(TRY(t=aafilt(subdiv_vol(subdiv),&desc->input_fws))); // t is on the gpu
       TIME(TRY(xform(out,t,desc->transform,&desc->aws)));
     } while(next_subdivision(subdiv));
     free_subdiv(subdiv);
@@ -515,10 +563,12 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
     subdiv=0;
   } // end loop over tiles
 
-  TODO;
+  
   /* 
   Antialiasing on the output.
   */
+  TODO;  
+  TRY(out=aafilt(out,&desc->output_fws));
 
 Finalize:
   PROGRESS(ENDL);
@@ -537,7 +587,7 @@ static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_
   // maybe allocate output
   if(!out)
   { int64_t *cshape_nm;
-    unsigned n=desc->nchildren;
+    unsigned n=(unsigned) desc->nchildren;
     const float s[]={ (n>>=1)?2.0f:1.0f,
                       (n>>=1)?2.0f:1.0f,
                       (n>>=1)?2.0f:1.0f };
@@ -549,7 +599,8 @@ static nd_t render_child_to_parent(desc_t *desc,aabb_t bbox, address_t path, nd_
   }
   // paste child into output
   box2box(desc->transform,out,bbox,child,cbox);
-  TRY(t=aafilt_child(child,desc->transform,&desc->fws));
+  TRY(compute_aa_filters(&desc->input_fws,desc->transform,ndndim(child)));
+  TRY(t=aafilt(child,&desc->input_fws));
   TRY(xform(out,t,desc->transform,&desc->aws));
   return out;
 Error:
@@ -568,9 +619,9 @@ static nd_t render_node(desc_t *desc, aabb_t bbox, address_t path)
   aabb_t *cboxes=0;
   ALLOCA(aabb_t,cboxes,desc->nchildren);
   ZERO(  aabb_t,cboxes,desc->nchildren);
-  TRY(AABBBinarySubdivision(cboxes,desc->nchildren,bbox));
+  TRY(AABBBinarySubdivision(cboxes,(unsigned)desc->nchildren,bbox));
   for(i=0;i<desc->nchildren;++i)
-  { nd_t t,c=0;
+  { nd_t c=0;
     TRY(address_push(path,i));
     c=desc->make(desc,cboxes[i],path);
     TRY(address_pop(path));
@@ -715,7 +766,7 @@ Error:
  *                           are ready.
  * \param[in]   args         Additional arguments to be passed to yeild.
  */
-unsigned addresses(const struct render *opts, tiles_t tiles, size_t countof_leaf, handler_t yield, void* args)
+unsigned addresses(const struct render *opts, tiles_t tiles, handler_t yield, void* args)
 { unsigned ok=1;
   desc_t desc=make_desc(opts,tiles,yield,args);
   aabb_t bbox=0;

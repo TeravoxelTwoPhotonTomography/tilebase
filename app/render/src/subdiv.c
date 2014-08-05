@@ -47,10 +47,18 @@ subdiv_t  make_subdiv(nd_t in, float *transform, int ndim,size_t free,size_t tot
                   ndref(ndinit(),nddata(in),ndkind(in)),
                   ndtype(in)),
                 ndndim(in),ndshape(in)));
-  memcpy(ndstrides(ctx->carray),ndstrides(in),(ndndim(in)+1)*sizeof(size_t));
+  memcpy(ndstrides(ctx->carray),ndstrides(in),(ndndim(in)+1)*sizeof(size_t)); // copy input strides
+
   ctx->dz_px=ndshape(ctx->carray)[2]/ctx->n;        // max size of each block.
   ctx->n+=(ctx->dz_px*ctx->n<ndshape(ctx->carray)[2]); // need one last block if not evenly divisible
   ndshape(ctx->carray)[2]=ctx->dz_px; // don't adjust strides, will get copied to a correctly formatted array on the gpu
+
+  //but adjust the total byte size according to the new number of planes
+  { 
+    ndstrides(ctx->carray)[ndim]/=ndshape(in)[2];
+    ndstrides(ctx->carray)[ndim]*=ndshape(ctx->carray)[2];
+  }
+
   LOG("\t%5s: %10d\n" "\t%5s: %10d\n","n",(int)ctx->n,"dz_px",(int)ctx->dz_px);
   {
     int r;

@@ -534,10 +534,6 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
         NEW(float,desc->transform,(n+1)*(n+1));   // FIXME: pretty sure this is a memory leak.  transform get's init'd for each leaf without being freed
       TRY(set_ref_shape(desc,in));
       affine_workspace__set_boundary_value(&desc->aws,in);
-#if HAVE_CUDA
-      if(desc->total==0)
-        TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total));
-#endif
     }
     if(!same_shape(in,TileShape(tiles[i]))) // maybe resize "in"
     { nd_t s=TileShape(tiles[i]);
@@ -545,12 +541,19 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
         TRY(ndref(in,realloc(nddata(in),ndnbytes(s)),nd_heap));
       TRY(ndcast(ndreshape(in,ndndim(s),ndshape(s)),ndtype(s)));
     }
-    if(!out) TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
+    if(!out) {
+      TRY(out=alloc_vol(desc,bbox,desc->x_nm,desc->y_nm,desc->z_nm));    // Alloc on first iteration: out, must come after set_ref_shape
+      TIME(TRY(filter_workspace__gpu_resize(&desc->output_fws,out)));
+    }
     // The main idea
     TIME(TRY(ndioRead(TileFile(tiles[i]),in)));
     DUMP("tile.%.tif",in);
     TRY(crop(ndPushShape(in),TileCrop(tiles[i])));
     DUMP("crop.%.tif",in);    
+#if HAVE_CUDA
+    if(desc->total==0)
+      TRY(cudaSuccess==cudaMemGetInfo(&desc->free,&desc->total));
+#endif
     TRY(subdiv=make_subdiv(in,TileTransform(tiles[i]),ndndim(in),desc->free,desc->total));
     do
     { TIME(compose(desc->transform,bbox,desc->x_nm,desc->y_nm,desc->z_nm,subdiv_xform(subdiv),ndndim(in)));
@@ -567,7 +570,6 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   /* 
   Antialiasing on the output.
   */
-  TODO;  
   TRY(out=aafilt(out,&desc->output_fws));
 
 Finalize:

@@ -570,7 +570,8 @@ static nd_t render_leaf(desc_t *desc, aabb_t bbox, address_t path)
   /* 
   Antialiasing on the output.
   */
-  TRY(out=aafilt(out,&desc->output_fws));
+  if(out)
+    TRY(out=aafilt(out,&desc->output_fws));
 
 Finalize:
   PROGRESS(ENDL);

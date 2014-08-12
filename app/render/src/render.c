@@ -427,15 +427,15 @@ Error:
 
 static int compute_output_filters(filter_workspace *ws, float sx, float sy, float sz)
 { nd_t f=0;
-  TIME(f=make_aa_filter(1.0f,sx,ws->scale_thresh,ws->filters[0]));
+  f=make_aa_filter(1.0f,sx,ws->scale_thresh,ws->filters[0]);
   ws->enable[0]=(f!=NULL);
   if(f) ws->filters[0]=f;
   
-  TIME(f=make_aa_filter(1.0f,sy,ws->scale_thresh,ws->filters[1]));
+  f=make_aa_filter(1.0f,sy,ws->scale_thresh,ws->filters[1]);
   ws->enable[1]=(f!=NULL);
   if(f) ws->filters[1]=f;
 
-  TIME(f=make_aa_filter(1.0f,sz,ws->scale_thresh,ws->filters[2]));
+  f=make_aa_filter(1.0f,sz,ws->scale_thresh,ws->filters[2]);
   ws->enable[2]=(f!=NULL);
   if(f) ws->filters[2]=f;
   return 1;

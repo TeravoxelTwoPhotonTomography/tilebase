@@ -265,7 +265,6 @@ int main(int argc, char* argv[])
     OPTS=parseargs(&argc,&argv,&isok);
     TRY(isok);
   }
-  set_render_opts(&render_opts);
   fprintf(stderr,"GPU: %d\n",(int)(OPTS.gpu_id));
   cudaSetDevice(OPTS.gpu_id);
   //printf("OPTS: %s %s\n",OPTS.src,OPTS.dst);
@@ -308,6 +307,7 @@ int main(int argc, char* argv[])
 
   if(OPTS.flag_print_addresses)
   { target_bbox(tiles);
+    set_render_opts(&render_opts);
     TRY(addresses(&render_opts,tiles,print_addr,stdout));
     goto Finalize;
   }
@@ -315,10 +315,12 @@ int main(int argc, char* argv[])
   if(OPTS.target)
   { printf("RENDERING TARGET: ");
     print_addr(0,OPTS.target,0,stdout);
+    set_render_opts(&render_opts);
     TRY(render_target(&render_opts,tiles,on_ready,NULL,load,OPTS.target));
     goto Finalize;
   }
 
+  set_render_opts(&render_opts);
   TRY(render(&render_opts,tiles,on_ready,NULL));
 
 Finalize:

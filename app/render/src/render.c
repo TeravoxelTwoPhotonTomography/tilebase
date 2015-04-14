@@ -460,7 +460,7 @@ static nd_t aafilt(nd_t vol, filter_workspace *ws)
   DUMP("aafilt-src.%.tif",ws->gpu[0]);
   for(i=0,j=0;i<3;++i)
     if(ws->enable[i]) 
-    { TIME(TRY(ndconv1(ws->gpu[~j&1],ws->gpu[j&1],ws->filters[i],i,&ws->params)));
+    { TIME(TRY(ndconv1(ws->gpu[~j&1],ws->gpu[j&1],ws->filters[j],j,&ws->params)));
       ++j;
     }
   ws->i=j&1; // this will be the index of the last destination buffer
